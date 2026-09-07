@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+}
+
+body {
+  background-color: #fbfbfa;
+  color: #111827;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
