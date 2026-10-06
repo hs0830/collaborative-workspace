@@ -3,6 +3,61 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCurrentUser, setUserName } from '../lib/user';
+
+/** 내 이름 표시·변경 (채팅 발신자, 에디터 커서 이름표에 사용) */
+function UserBadge() {
+  const user = useCurrentUser();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  if (!user) return null;
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setUserName(draft);
+          setEditing(false);
+        }}
+        className="flex gap-1 px-2"
+      >
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={20}
+          placeholder="내 이름"
+          className="flex-1 min-w-0 text-xs border border-gray-300 dark:border-slate-700 dark:bg-slate-800 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500"
+        />
+        <button type="submit" className="text-xs px-2 rounded-lg bg-gray-900 text-white dark:bg-blue-600 cursor-pointer">
+          저장
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        setDraft(user.name);
+        setEditing(true);
+      }}
+      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-200/60 dark:hover:bg-slate-800 text-left cursor-pointer"
+      title="이름 변경"
+    >
+      <span
+        className="w-7 h-7 rounded-full text-white text-xs font-bold flex items-center justify-center shrink-0"
+        style={{ backgroundColor: user.color }}
+      >
+        {user.name.slice(0, 1)}
+      </span>
+      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">{user.name}</span>
+      <span className="ml-auto text-[10px] text-gray-400">변경</span>
+    </button>
+  );
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -102,6 +157,8 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      <UserBadge />
     </aside>
   );
 }

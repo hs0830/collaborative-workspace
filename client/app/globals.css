@@ -31,3 +31,56 @@ body {
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
+/* ───────── 협업 에디터 (Tiptap) ───────── */
+.prose-editor h2 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+.prose-editor h1 { font-size: 1.5rem; font-weight: 800; margin: 1rem 0 0.5rem; }
+.prose-editor h3 { font-size: 1.1rem; font-weight: 700; margin: 0.75rem 0 0.25rem; }
+.prose-editor p { margin: 0.25rem 0; }
+.prose-editor ul { list-style: disc; padding-left: 1.5rem; }
+.prose-editor ol { list-style: decimal; padding-left: 1.5rem; }
+.prose-editor blockquote { border-left: 3px solid #d1d5db; padding-left: 0.75rem; color: #6b7280; }
+.prose-editor pre { background: #111827; color: #f9fafb; padding: 0.75rem 1rem; border-radius: 0.5rem; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.prose-editor code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 0.25rem; }
+.prose-editor pre code { background: none; padding: 0; }
+
+/* 빈 문서 안내 문구 */
+.prose-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* 다른 사람 커서와 이름표 */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px 3px 3px 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* ───────── 인쇄(PDF) 시 문서만 출력 ───────── */
+@media print {
+  aside, .no-print, main > div > header { display: none !important; }
+  main { padding: 0 !important; max-width: none !important; }
+  .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; }
+  .prose-editor { border: none !important; }
+  .collaboration-cursor__caret, .collaboration-cursor__label { display: none; }
+}
