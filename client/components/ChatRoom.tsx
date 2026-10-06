@@ -1,40 +1,33 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getSocket, useSocketConnected, fileUrl } from '../lib/socket';
-import { SERVER_URL } from '../lib/config';
-import { useCurrentUser } from '../lib/user';
-import type { ChatFile, ChatMessage } from '../lib/types';
+import { emitAction, getSocket, useSocketConnected, useSynced } from '../lib/socket';
+import { useCurrentUser } from '../lib/auth';
+import { downloadFile, formatSize, LIMITS, uploadFile, useFileViewUrl } from '../lib/files';
+import type { ChatMessage, StoredFile } from '../lib/types';
 
-const MAX_SIZE = 20 * 1024 * 1024; // 20MB (서버 제한과 동일)
-
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-
-const formatSize = (bytes: number) =>
-  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(bytes / 1024))}KB`;
+const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
 export default function ChatRoom() {
   const user = useCurrentUser();
   const connected = useSocketConnected();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const history = useSynced<ChatMessage[]>('chat', 'chat:history');
+  const [messages, setMessages] = useState<ChatMessage[]>(history ?? []);
   const [inputText, setInputText] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // 서버에서 기록·새 메시지 받기
+  // 전체 기록(접속·이름 변경 시) + 새 메시지 실시간 수신
+  useEffect(() => {
+    if (history) setMessages(history);
+  }, [history]);
+
   useEffect(() => {
     const s = getSocket();
-    const onHistory = (list: ChatMessage[]) => setMessages(list);
-    const onMessage = (msg: ChatMessage) =>
-      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-
-    s.on('chat:history', onHistory);
+    const onMessage = (msg: ChatMessage) => setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
     s.on('chat:message', onMessage);
-    if (s.connected) s.emit('chat:get');
     return () => {
-      s.off('chat:history', onHistory);
       s.off('chat:message', onMessage);
     };
   }, []);
@@ -44,51 +37,39 @@ export default function ChatRoom() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages.length]);
 
-  const send = (text: string, file?: ChatFile) => {
-    if (!user) return;
-    getSocket().emit('chat:send', {
-      senderId: user.id,
-      sender: user.name,
-      color: user.color,
-      text,
-      file,
-    });
-  };
-
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputText.trim();
     if (!text || !connected) return;
-    send(text);
     setInputText('');
+    const res = await emitAction('chat:send', { text });
+    if (!res.ok) {
+      setInputText(text); // 실패하면 입력 내용 복원
+      alert(res.error || '메시지를 보내지 못했습니다.');
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (!file) return;
-
-    if (file.size > MAX_SIZE) {
+    if (file.size > LIMITS.chat) {
       alert('파일 용량은 최대 20MB까지 업로드할 수 있습니다.');
       return;
     }
 
-    setUploading(true);
+    setProgress(0);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch(`${SERVER_URL}/api/upload`, { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '업로드 실패');
-      send('', data as ChatFile);
+      const stored = await uploadFile('chat', file, setProgress);
+      await emitAction('chat:send', { fileId: stored.id });
     } catch (err) {
       alert(err instanceof Error ? err.message : '업로드에 실패했습니다.');
     } finally {
-      setUploading(false);
+      setProgress(null);
     }
   };
 
   return (
-    <div className="flex flex-col h-[560px] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-14rem)] min-h-[420px] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/40 flex justify-between items-center">
         <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm flex items-center gap-2">
           💬 팀 실시간 채팅
@@ -109,38 +90,28 @@ export default function ChatRoom() {
               </span>
               <div
                 className={`max-w-[85%] px-3 py-2 rounded-lg text-sm whitespace-pre-wrap break-words ${
-                  mine
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-bl-none'
+                  mine ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-bl-none'
                 }`}
               >
                 {msg.text && <p>{msg.text}</p>}
-
-                {msg.file?.isImage && (
-                  <a href={fileUrl(msg.file.url)} target="_blank" rel="noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={fileUrl(msg.file.url)}
-                      alt={msg.file.name}
-                      className="mt-1 rounded-md max-h-40 object-cover border border-gray-200"
-                    />
-                  </a>
-                )}
-
-                {msg.file && !msg.file.isImage && (
-                  <a
-                    href={fileUrl(msg.file.url)}
-                    download={msg.file.name}
-                    className="flex items-center gap-1 text-xs underline underline-offset-2 opacity-90 hover:opacity-100"
-                  >
-                    📎 {msg.file.name} ({formatSize(msg.file.size)})
-                  </a>
-                )}
+                {msg.file && <Attachment file={msg.file} />}
               </div>
             </div>
           );
         })}
       </div>
+
+      {progress !== null && (
+        <div className="px-4 pb-2">
+          <div className="flex justify-between text-[11px] text-gray-500 mb-1">
+            <span>파일 업로드 중...</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-1.5">
+            <div className="bg-blue-600 h-1.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
 
       {/* 입력 박스 */}
       <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -148,11 +119,11 @@ export default function ChatRoom() {
           <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={!connected || uploading}
+            disabled={!connected || progress !== null}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition disabled:opacity-40"
             title="파일 첨부"
           >
-            {uploading ? '⏳' : '📎'}
+            📎
           </button>
           <input
             type="text"
@@ -165,7 +136,7 @@ export default function ChatRoom() {
               handleSend();
             }}
             placeholder={connected ? '메시지 입력...' : '서버에 연결 중...'}
-            className="flex-1 text-sm border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition"
+            className="flex-1 min-w-0 text-sm border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition"
           />
           <button
             onClick={handleSend}
@@ -177,5 +148,29 @@ export default function ChatRoom() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Attachment({ file }: { file: StoredFile }) {
+  const viewUrl = useFileViewUrl(file.isImage ? file.id : undefined);
+
+  if (file.isImage) {
+    return viewUrl ? (
+      <a href={viewUrl} target="_blank" rel="noreferrer">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={viewUrl} alt={file.name} className="mt-1 rounded-md max-h-48 object-cover border border-gray-200" />
+      </a>
+    ) : (
+      <div className="mt-1 w-40 h-24 rounded-md bg-black/10 animate-pulse" />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => downloadFile(file.id).catch((e) => alert(e.message))}
+      className="flex items-center gap-1 text-xs underline underline-offset-2 opacity-90 hover:opacity-100 cursor-pointer text-left"
+    >
+      📎 {file.name} ({formatSize(file.size)})
+    </button>
   );
 }

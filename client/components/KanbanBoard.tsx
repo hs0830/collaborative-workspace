@@ -14,6 +14,9 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useKanban } from '../lib/useKanban';
+import { useSynced } from '../lib/socket';
+import type { Member } from '../lib/auth';
+import { todayStr } from '../lib/date';
 import { TAGS, type ColumnColor, type KanbanColumn, type KanbanTask, type Tag } from '../lib/types';
 
 // Tailwind는 클래스 이름을 그대로 찾아야 하므로 색상별 클래스를 미리 적어 둠
@@ -31,6 +34,7 @@ const inputCls =
 
 export default function KanbanBoard() {
   const { state, dispatch, connected } = useKanban();
+  const members = useSynced<Member[]>('team', 'team:state') ?? [];
 
   const [selectedTag, setSelectedTag] = useState<'전체' | Tag>('전체');
   const [newTitle, setNewTitle] = useState('');
@@ -112,7 +116,12 @@ export default function KanbanBoard() {
       <div className="pb-4 border-b border-gray-100 dark:border-slate-800">
         <form onSubmit={handleAddTask} className="flex flex-wrap gap-2 flex-1">
           <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="새 작업 내용 입력..." className={`${inputCls} flex-1 min-w-40`} />
-          <input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="담당자" className={`${inputCls} w-24`} />
+          <input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="담당자" list="kanban-members" className={`${inputCls} w-28`} />
+          <datalist id="kanban-members">
+            {members.map((m) => (
+              <option key={m.id} value={m.name} />
+            ))}
+          </datalist>
           <select value={newTag} onChange={(e) => setNewTag(e.target.value as Tag)} className={`${inputCls} px-2`}>
             {TAGS.map((t) => (
               <option key={t}>{t}</option>
@@ -250,7 +259,7 @@ function DraggableCard({
     return (
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-blue-300 space-y-2 text-xs">
         <input value={title} onChange={(e) => setTitle(e.target.value)} className={`${inputCls} w-full py-1`} />
-        <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="담당자" className={`${inputCls} w-full py-1`} />
+        <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="담당자" list="kanban-members" className={`${inputCls} w-full py-1`} />
         <div className="flex gap-1">
           <select value={tag} onChange={(e) => setTag(e.target.value as Tag)} className={`${inputCls} px-1 py-1 flex-1`}>
             {TAGS.map((t) => (
@@ -323,7 +332,7 @@ function DraggableCard({
 }
 
 function CardBody({ task, actions, dragging }: { task: KanbanTask; actions?: React.ReactNode; dragging?: boolean }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const overdue = task.dueDate && task.dueDate < today;
 
   return (

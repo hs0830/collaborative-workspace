@@ -1,10 +1,14 @@
 // 서버(server/store.js)와 주고받는 데이터 형태
 
-export interface ChatFile {
-  url: string; // 서버 기준 경로 (/uploads/...)
+/** 업로드된 파일 정보 (채팅 첨부·데이터셋 공통) */
+export interface StoredFile {
+  id: string;
   name: string;
   size: number;
+  contentType: string;
   isImage: boolean;
+  uploaderName: string;
+  createdAt: string;
 }
 
 export interface ChatMessage {
@@ -13,7 +17,7 @@ export interface ChatMessage {
   sender: string;
   color: string;
   text: string;
-  file?: ChatFile;
+  file?: StoredFile;
   createdAt: string; // ISO 시각
 }
 
@@ -48,3 +52,21 @@ export type KanbanAction =
   | { type: 'task:delete'; payload: { id: string } }
   | { type: 'column:add'; payload: { label: string; color?: ColumnColor } }
   | { type: 'column:delete'; payload: { id: string } };
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  assignee: string;
+}
+
+export type CalendarAction =
+  | { type: 'event:add'; payload: Omit<CalendarEvent, 'id'> }
+  | { type: 'event:delete'; payload: { id: string } };
+
+export type TeamAction =
+  | { type: 'member:add'; payload: { name: string; role?: string; email?: string } }
+  | { type: 'member:update'; payload: { id: string; name?: string; role?: string; email?: string } }
+  | { type: 'member:delete'; payload: { id: string } };
+
+export type { Member } from './auth';

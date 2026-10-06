@@ -9,7 +9,7 @@ import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import Placeholder from '@tiptap/extension-placeholder';
 import { YJS_URL } from '../lib/config';
-import { useCurrentUser, type CurrentUser } from '../lib/user';
+import { getToken, useCurrentUser, type Member } from '../lib/auth';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -31,7 +31,7 @@ export default function CollaborativeEditor({ room = 'default-room' }: { room?: 
 
   useEffect(() => {
     const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider(YJS_URL, room, ydoc);
+    const provider = new WebsocketProvider(YJS_URL, room, ydoc, { params: { token: getToken() ?? '' } });
 
     provider.on('status', (e: { status: Status }) => setStatus(e.status));
     provider.on('sync', (isSynced: boolean) => setSynced(isSynced));
@@ -61,7 +61,7 @@ function EditorInner({
 }: {
   ydoc: Y.Doc;
   provider: WebsocketProvider;
-  user: CurrentUser;
+  user: Member;
   status: Status;
   synced: boolean;
 }) {
