@@ -13,6 +13,7 @@ const navItems = [
   { name: '대시보드', href: '/', icon: '📊' },
   { name: '팀원 관리', href: '/team', icon: '👥' },
   { name: '실시간 문서', href: '/editor', icon: '📝' },
+  { name: '회의록', href: '/meetings', icon: '🗒️' },
   { name: '작업 & 칸반', href: '/kanban', icon: '📋' },
   { name: '팀 캘린더', href: '/calendar', icon: '📅' },
   { name: '대용량 데이터셋', href: '/datasets', icon: '💾' },
@@ -162,7 +163,7 @@ export default function Sidebar() {
         {/* 메뉴 리스트 */}
         <nav className="space-y-1 flex-1 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

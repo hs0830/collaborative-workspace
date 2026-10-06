@@ -23,7 +23,18 @@ interface Peer {
  * 연결(Y.Doc + WebsocketProvider)을 만들고, 준비되면 실제 에디터를 렌더링합니다.
  * 연결과 에디터를 나눠 두면 React 개발 모드의 이중 마운트에서도 연결이 꼬이지 않습니다.
  */
-export default function CollaborativeEditor({ room = 'default-room' }: { room?: string }) {
+interface EditorOptions {
+  /** 비어 있는 새 문서에 한 번 채워 넣을 기본 양식 (HTML) */
+  template?: string;
+  /** 기본 양식을 넣은 뒤 호출 */
+  onTemplateApplied?: () => void;
+  /** 상단 제목 */
+  label?: string;
+  /** Markdown 내보내기 파일 이름 (확장자 제외) */
+  exportName?: string;
+}
+
+export default function CollaborativeEditor({ room = 'default-room', ...options }: { room?: string } & EditorOptions) {
   const user = useCurrentUser();
   const [conn, setConn] = useState<{ ydoc: Y.Doc; provider: WebsocketProvider } | null>(null);
   const [status, setStatus] = useState<Status>('connecting');
@@ -46,10 +57,10 @@ export default function CollaborativeEditor({ room = 'default-room' }: { room?: 
   }, [room]);
 
   if (!conn || !user) {
-    return <EditorShell status={status} peers={[]} editor={null} />;
+    return <EditorShell status={status} peers={[]} editor={null} options={options} />;
   }
 
-  return <EditorInner {...conn} user={user} status={status} synced={synced} />;
+  return <EditorInner {...conn} user={user} status={status} synced={synced} options={options} />;
 }
 
 function EditorInner({
@@ -58,12 +69,14 @@ function EditorInner({
   user,
   status,
   synced,
+  options,
 }: {
   ydoc: Y.Doc;
   provider: WebsocketProvider;
   user: Member;
   status: Status;
   synced: boolean;
+  options: EditorOptions;
 }) {
   const [peers, setPeers] = useState<Peer[]>([]);
 
@@ -105,7 +118,18 @@ function EditorInner({
     return () => provider.awareness.off('change', update);
   }, [provider]);
 
-  return <EditorShell status={status} peers={peers} editor={editor} loading={!synced} />;
+  // 새 문서면 기본 양식 채우기 (서버에서 기존 내용이 늦게 도착하는 경우를 대비해 잠깐 기다린 뒤 확인)
+  const { template, onTemplateApplied } = options;
+  useEffect(() => {
+    if (!editor || !synced || !template) return;
+    const timer = setTimeout(() => {
+      if (editor.isEmpty) editor.commands.setContent(template);
+      onTemplateApplied?.();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [editor, synced, template, onTemplateApplied]);
+
+  return <EditorShell status={status} peers={peers} editor={editor} loading={!synced} options={options} />;
 }
 
 function EditorShell({
@@ -113,11 +137,13 @@ function EditorShell({
   peers,
   editor,
   loading = true,
+  options,
 }: {
   status: Status;
   peers: Peer[];
   editor: Editor | null;
   loading?: boolean;
+  options: EditorOptions;
 }) {
   const downloadMarkdown = () => {
     if (!editor) return;
@@ -125,7 +151,7 @@ function EditorShell({
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `workspace-doc-${new Date().toISOString().slice(0, 10)}.md`;
+    a.download = `${(options.exportName || `workspace-doc-${new Date().toISOString().slice(0, 10)}`).replace(/[\\/:*?"<>|]/g, '_')}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -140,7 +166,7 @@ function EditorShell({
     <div className="print-area bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xs p-6 space-y-4">
       <div className="no-print flex flex-wrap gap-3 justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-700 dark:text-gray-200">📄 실시간 협업 문서</span>
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{options.label ?? '📄 실시간 협업 문서'}</span>
           <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
             <span className={`w-2 h-2 rounded-full ${statusLabel.dot}`} />
             {statusLabel.text}

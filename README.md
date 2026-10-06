@@ -7,6 +7,7 @@
 | 📊 대시보드 | 칸반·캘린더 데이터로 진행률, 팀원별 분담, 다가오는 마감을 자동 계산 |
 | 👥 팀원 관리 | 역할·이메일 관리, 칸반 담당자 이름으로 업무 자동 연결 |
 | 📝 실시간 문서 | Tiptap + Yjs 공동 편집, 상대 커서 표시, Markdown·PDF 내보내기 |
+| 🗒️ 회의록 | 회의별 공동 편집 문서, 기본 양식, 검색, 할 일을 칸반 카드로 바로 등록, 캘린더 표시 |
 | 📋 칸반 | 드래그 앤 드롭, 컬럼 추가·삭제, 태그 필터, 마감일 |
 | 📅 캘린더 | 팀 일정 + 칸반 마감일 자동 표시 |
 | 💾 데이터셋 | 최대 1GB 파일을 저장소(R2)에 직접 업로드, 팀 공유 |
@@ -128,7 +129,7 @@ AUTH_SECRET=아무_긴_무작위_문자열
 
 ```
 client/
-  app/                 각 화면 (대시보드, team, editor, kanban, calendar, datasets, chat, login)
+  app/                 각 화면 (대시보드, team, editor, meetings, kanban, calendar, datasets, chat, login)
   components/          AppShell(로그인 확인), Sidebar, KanbanBoard, ChatRoom, CollaborativeEditor, DatasetUploader
   lib/
     auth.ts            로그인 토큰, API 호출

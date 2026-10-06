@@ -75,3 +75,16 @@ alter table calendar_events  enable row level security;
 alter table files            enable row level security;
 alter table chat_messages    enable row level security;
 alter table yjs_documents    enable row level security;
+
+-- 회의록 (본문은 yjs_documents 에 'yjs/meeting-<id>' 이름으로 저장)
+create table if not exists meetings (
+  id          text primary key,
+  title       text not null,
+  date        text not null,
+  attendees   text not null default '[]',   -- 참석자 이름 JSON 배열
+  created_by  text not null default '',
+  preview     text not null default '',     -- 목록·검색용 본문 앞부분
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+alter table meetings enable row level security;

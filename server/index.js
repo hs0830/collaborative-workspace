@@ -9,7 +9,7 @@ const auth = require('./auth');
 const db = require('./db');
 const store = require('./store');
 const storage = require('./storage');
-const { setupYjsPersistence } = require('./yjs');
+const { setupYjsPersistence, closeDoc } = require('./yjs');
 
 const app = express();
 const server = http.createServer(app);
@@ -154,6 +154,7 @@ const SNAPSHOTS = {
   calendar: () => ['calendar:state', store.getEvents()],
   team: () => ['team:state', store.getMembers()],
   datasets: () => ['datasets:state', store.listDatasets()],
+  meetings: () => ['meetings:state', store.getMeetings()],
 };
 
 io.on('connection', (socket) => {
@@ -174,7 +175,7 @@ io.on('connection', (socket) => {
       try {
         const result = await serial(() => apply(payload, member));
         const ok = typeof result === 'object' && result !== null ? result.ok : Boolean(result);
-        if (ok) broadcast(result);
+        if (ok) broadcast(result, payload);
         reply(ack, typeof result === 'object' && result !== null ? result : { ok });
       } catch (err) {
         console.error(event, err);
@@ -196,6 +197,15 @@ io.on('connection', (socket) => {
   handle('calendar:action', (action) => store.applyCalendarAction(action), () => io.emit(...SNAPSHOTS.calendar()));
 
   handle(
+    'meeting:action',
+    (action, member) => store.applyMeetingAction(action, member),
+    (_result, action) => {
+      if (action?.type === 'meeting:delete') closeDoc(store.meetingDocName(action.payload?.id));
+      io.emit(...SNAPSHOTS.meetings());
+    }
+  );
+
+  handle(
     'team:action',
     (action) => store.applyTeamAction(action),
     () => {
@@ -204,6 +214,7 @@ io.on('connection', (socket) => {
       io.emit(...SNAPSHOTS.kanban());
       io.emit(...SNAPSHOTS.calendar());
       io.emit(...SNAPSHOTS.chat());
+      io.emit(...SNAPSHOTS.meetings());
     }
   );
 });
@@ -241,7 +252,18 @@ server.on('upgrade', (request, socket, head) => {
   try {
     await db.migrate();
     await store.init();
-    setupYjsPersistence();
+    // 회의록 본문이 저장되면 목록의 미리보기·수정 시각 갱신
+    setupYjsPersistence((docName, getText) => {
+      const m = /^yjs\/meeting-(.+)$/.exec(docName);
+      if (!m) return;
+      serial(() => store.touchMeeting(m[1], getText()))
+        .then((changed) => changed && io.emit(...SNAPSHOTS.meetings()))
+        .catch((err) => console.error('회의록 갱신 실패:', err.message));
+    }, (docName) => {
+      // 삭제된 회의록 문서는 다시 저장하지 않음
+      const m = /^yjs\/meeting-(.+)$/.exec(docName);
+      return !m || Boolean(store.getMeeting(m[1]));
+    });
   } catch (err) {
     console.error('❌ 초기화 실패:', err.message);
     process.exit(1);

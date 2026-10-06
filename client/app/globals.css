@@ -60,7 +60,7 @@ button:not(:disabled),
 
 /* ───────── 인쇄(PDF) 시 문서만 출력 ───────── */
 @media print {
-  aside, .no-print, main > div > header { display: none !important; }
+  aside, .no-print, .md\:hidden { display: none !important; }
   main { padding: 0 !important; max-width: none !important; }
   .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; }
   .prose-editor { border: none !important; }

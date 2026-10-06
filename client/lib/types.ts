@@ -69,4 +69,20 @@ export type TeamAction =
   | { type: 'member:update'; payload: { id: string; name?: string; role?: string; email?: string } }
   | { type: 'member:delete'; payload: { id: string } };
 
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  attendees: string[];
+  createdBy: string;
+  preview: string; // 본문 앞부분 (목록·검색용)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MeetingAction =
+  | { type: 'meeting:add'; payload: { title: string; date: string; attendees: string[] } }
+  | { type: 'meeting:update'; payload: { id: string; title?: string; date?: string; attendees?: string[] } }
+  | { type: 'meeting:delete'; payload: { id: string } };
+
 export type { Member } from './auth';

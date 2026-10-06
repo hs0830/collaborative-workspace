@@ -5,13 +5,14 @@ import type { Member } from '../../lib/auth';
 import { emitAction, useSynced } from '../../lib/socket';
 import { doneColumnId, useKanban } from '../../lib/useKanban';
 import { toDateStr, todayStr } from '../../lib/date';
-import type { CalendarAction, CalendarEvent } from '../../lib/types';
+import type { CalendarAction, CalendarEvent, Meeting } from '../../lib/types';
+import Link from 'next/link';
 
 interface DayItem {
   id: string;
   title: string;
   assignee: string;
-  kind: 'event' | 'task';
+  kind: 'event' | 'task' | 'meeting';
   done?: boolean;
 }
 
@@ -31,12 +32,14 @@ export default function CalendarPage() {
 
   const events = useSynced<CalendarEvent[]>('calendar', 'calendar:state') ?? [];
   const members = useSynced<Member[]>('team', 'team:state') ?? [];
+  const meetings = useSynced<Meeting[]>('meetings', 'meetings:state') ?? [];
   const { state: kanban } = useKanban();
   const doneId = kanban ? doneColumnId(kanban.columns) : undefined;
 
   // 날짜별로 일정 + 칸반 마감 카드 모으기
   const byDate = new Map<string, DayItem[]>();
   const push = (date: string, item: DayItem) => byDate.set(date, [...(byDate.get(date) ?? []), item]);
+  meetings.forEach((m) => push(m.date, { id: m.id, title: m.title, assignee: m.attendees.join(', ') || '참석자 없음', kind: 'meeting' }));
   events.forEach((e) => push(e.date, { id: e.id, title: e.title, assignee: e.assignee, kind: 'event' }));
   kanban?.tasks.forEach(
     (t) => t.dueDate && push(t.dueDate, { id: t.id, title: t.title, assignee: t.assignee, kind: 'task', done: t.statusId === doneId })
@@ -145,7 +148,9 @@ export default function CalendarPage() {
                     <span
                       key={it.id}
                       className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate w-full ${
-                        it.kind === 'event'
+                        it.kind === 'meeting'
+                          ? 'bg-purple-600 text-white'
+                          : it.kind === 'event'
                           ? 'bg-blue-600 text-white'
                           : it.done
                           ? 'bg-gray-100 text-gray-400 line-through dark:bg-slate-800'
@@ -164,6 +169,7 @@ export default function CalendarPage() {
           <div className="flex gap-3 text-[10px] text-gray-500">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-600" /> 일정</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-200" /> 칸반 마감</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-600" /> 회의록</span>
           </div>
         </div>
 
@@ -199,13 +205,20 @@ export default function CalendarPage() {
                   className="p-2.5 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-lg text-xs flex justify-between items-start gap-2"
                 >
                   <div className="min-w-0">
-                    <p className={`font-semibold ${it.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                      {it.kind === 'task' ? '📋 ' : ''}
-                      {it.title}
-                    </p>
+                    {it.kind === 'meeting' ? (
+                      <Link href={`/meetings/${it.id}`} className="font-semibold text-purple-600 dark:text-purple-400 hover:underline">
+                        🗒️ {it.title}
+                      </Link>
+                    ) : (
+                      <p className={`font-semibold ${it.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                        {it.kind === 'task' ? '📋 ' : ''}
+                        {it.title}
+                      </p>
+                    )}
                     <p className="text-[10px] text-gray-400">
                       👤 {it.assignee}
                       {it.kind === 'task' && ' · 칸반 카드 마감'}
+                      {it.kind === 'meeting' && ' · 회의록'}
                     </p>
                   </div>
                   {it.kind === 'event' && (

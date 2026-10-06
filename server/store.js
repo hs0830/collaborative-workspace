@@ -26,6 +26,7 @@ const state = {
   events: [], // { id, title, date, assignee }
   files: new Map(), // id → { id, kind, storageKey, name, size, contentType, uploaderId, uploaderName, status, createdAt }
   chat: [], // { id, senderId, text, fileId, createdAt }
+  meetings: [], // { id, title, date, attendees: string[], createdBy, preview, createdAt, updatedAt }
 };
 
 // ───────────────────────── 초기화 ─────────────────────────
@@ -35,13 +36,14 @@ async function init() {
     return;
   }
 
-  const [m, c, t, e, f, ch] = await Promise.all([
+  const [m, c, t, e, f, ch, mt] = await Promise.all([
     q('select id, name, role, email, color from members order by created_at'),
     q('select id, label, color from kanban_columns order by position'),
     q('select id, title, assignee, tag, status_id, due_date from kanban_tasks order by created_at'),
     q('select id, title, date, assignee from calendar_events order by date, created_at'),
     q("select * from files where status = 'ready'"),
     q('select id, sender_id, text, file_id, created_at from chat_messages order by created_at desc limit $1', [MAX_CHAT_HISTORY]),
+    q('select * from meetings order by date desc, created_at desc'),
   ]);
 
   state.members = m.rows;
@@ -49,6 +51,7 @@ async function init() {
   state.tasks = t.rows.map((r) => ({ id: r.id, title: r.title, assignee: r.assignee, tag: r.tag, statusId: r.status_id, dueDate: r.due_date }));
   state.events = e.rows;
   f.rows.forEach((r) => state.files.set(r.id, fileFromRow(r)));
+  state.meetings = mt.rows.map(meetingFromRow);
   state.chat = ch.rows.reverse().map((r) => ({ id: r.id, senderId: r.sender_id, text: r.text, fileId: r.file_id, createdAt: r.created_at.toISOString() }));
 
   // 처음 실행이면 기본 컬럼 생성
@@ -144,6 +147,12 @@ async function applyTeamAction(action) {
         await q('update calendar_events set assignee = $2 where assignee = $1', [oldName, name]);
         state.tasks.forEach((t) => t.assignee === oldName && (t.assignee = name));
         state.events.forEach((e) => e.assignee === oldName && (e.assignee = name));
+        // 회의록 참석자 이름도 변경
+        for (const mt of state.meetings) {
+          if (!mt.attendees.includes(oldName)) continue;
+          mt.attendees = mt.attendees.map((a) => (a === oldName ? name : a));
+          await q('update meetings set attendees = $2 where id = $1', [mt.id, JSON.stringify(mt.attendees)]);
+        }
       }
       return { ok: true, renamed: oldName !== name };
     }
@@ -316,6 +325,109 @@ const listDatasets = () =>
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map(publicFile);
 
+// ───────────────────────── 회의록 ─────────────────────────
+// 회의 정보(제목·날짜·참석자)만 여기서 관리하고, 본문은 실시간 문서(Yjs)로 저장합니다.
+
+const meetingFromRow = (r) => ({
+  id: r.id,
+  title: r.title,
+  date: r.date,
+  attendees: safeJsonArray(r.attendees),
+  createdBy: r.created_by,
+  preview: r.preview,
+  createdAt: new Date(r.created_at).toISOString(),
+  updatedAt: new Date(r.updated_at).toISOString(),
+});
+
+function safeJsonArray(text) {
+  try {
+    const v = JSON.parse(text);
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+const cleanAttendees = (list) =>
+  Array.isArray(list) ? [...new Set(list.map((n) => str(n, 20)).filter(Boolean))].slice(0, 30) : [];
+
+const sortMeetings = () =>
+  state.meetings.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+
+const getMeetings = () => state.meetings;
+const getMeeting = (id) => state.meetings.find((m) => m.id === id) || null;
+
+/** 회의록 문서 이름 (y-websocket 이 붙이는 'yjs/' 접두사 포함) */
+const meetingDocName = (id) => `yjs/meeting-${id}`;
+
+async function applyMeetingAction(action, member) {
+  const p = action?.payload ?? {};
+  switch (action?.type) {
+    case 'meeting:add': {
+      const title = str(p.title, 100);
+      const date = dateOrEmpty(p.date);
+      if (!title || !date) return { ok: false, error: '제목과 날짜를 입력하세요.' };
+      const now = new Date().toISOString();
+      const mt = {
+        id: newId(),
+        title,
+        date,
+        attendees: cleanAttendees(p.attendees),
+        createdBy: member.name,
+        preview: '',
+        createdAt: now,
+        updatedAt: now,
+      };
+      await q('insert into meetings (id, title, date, attendees, created_by) values ($1, $2, $3, $4, $5)', [
+        mt.id, mt.title, mt.date, JSON.stringify(mt.attendees), mt.createdBy,
+      ]);
+      state.meetings.push(mt);
+      sortMeetings();
+      return { ok: true, id: mt.id };
+    }
+    case 'meeting:update': {
+      const mt = getMeeting(p.id);
+      if (!mt) return { ok: false, error: '회의록을 찾을 수 없습니다.' };
+      const next = {
+        title: p.title !== undefined ? str(p.title, 100) || mt.title : mt.title,
+        date: p.date !== undefined ? dateOrEmpty(p.date) || mt.date : mt.date,
+        attendees: p.attendees !== undefined ? cleanAttendees(p.attendees) : mt.attendees,
+      };
+      await q('update meetings set title = $2, date = $3, attendees = $4, updated_at = now() where id = $1', [
+        mt.id, next.title, next.date, JSON.stringify(next.attendees),
+      ]);
+      Object.assign(mt, next, { updatedAt: new Date().toISOString() });
+      sortMeetings();
+      return { ok: true };
+    }
+    case 'meeting:delete': {
+      const idx = state.meetings.findIndex((m) => m.id === p.id);
+      if (idx === -1) return { ok: false };
+      await q('delete from meetings where id = $1', [p.id]);
+      await q('delete from yjs_documents where name = $1', [meetingDocName(p.id)]);
+      state.meetings.splice(idx, 1);
+      return { ok: true };
+    }
+    default:
+      return { ok: false };
+  }
+}
+
+/**
+ * 회의록 본문이 저장될 때 호출 (yjs.js). 목록에 보여줄 미리보기와 수정 시각을 갱신합니다.
+ * 바뀐 게 있으면 true 를 돌려줘서 목록을 다시 배포하게 합니다.
+ */
+async function touchMeeting(id, preview) {
+  const mt = getMeeting(id);
+  if (!mt) return false;
+  const clean = str(preview, 300);
+  if (clean === mt.preview) return false;
+  mt.preview = clean;
+  mt.updatedAt = new Date().toISOString();
+  await q('update meetings set preview = $2, updated_at = now() where id = $1', [id, clean]);
+  return true;
+}
+
 // ───────────────────────── 채팅 ─────────────────────────
 const SYSTEM_SENDER = { name: '시스템', color: '#6b7280' };
 
@@ -366,4 +478,6 @@ module.exports = {
   createFile, getFile, markFileReady, deleteFile, listDatasets, publicFile,
   // 채팅
   getChatHistory, addChatMessage,
+  // 회의록
+  getMeetings, getMeeting, applyMeetingAction, touchMeeting, meetingDocName,
 };
