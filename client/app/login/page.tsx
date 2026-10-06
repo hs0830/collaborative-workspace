@@ -27,7 +27,7 @@ export default function LoginPage() {
       >
         <div className="space-y-1">
           <h1 className="text-xl font-extrabold text-gray-900 dark:text-white">🚀 팀 워크스페이스</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">팀장에게 받은 초대 코드와 이름을 입력하세요.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">초대 코드와 이름을 입력하세요.</p>
         </div>
 
         <div className="space-y-3 text-xs">
