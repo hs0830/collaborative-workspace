@@ -19,6 +19,9 @@ function makeKey(kind, originalName) {
   return `${kind}/${month}/${crypto.randomUUID()}${ext}`;
 }
 
+/** 브라우저에서 바로 보여줘도 안전한 형식 (이미지, PDF) */
+const canPreview = (contentType) => /^image\/(png|jpe?g|gif|webp)$|^application\/pdf$/.test(contentType);
+
 const contentDisposition = (name, inline) =>
   `${inline ? 'inline' : 'attachment'}; filename="${name.replace(/[^\x20-\x7e]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 
@@ -131,7 +134,7 @@ function mountLocalRoutes(app, store) {
     const file = store.getFile(req.params.id);
     if (!p || !['down', 'view'].includes(p.typ) || p.fid !== req.params.id || !file) return res.status(403).end();
 
-    const inline = p.typ === 'view' && /^image\/(png|jpe?g|gif|webp)$/.test(file.contentType);
+    const inline = p.typ === 'view' && canPreview(file.contentType);
     res.setHeader('Content-Type', inline ? file.contentType : 'application/octet-stream');
     res.setHeader('Content-Disposition', contentDisposition(file.name, inline));
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -139,4 +142,4 @@ function mountLocalRoutes(app, store) {
   });
 }
 
-module.exports = { driver, makeKey, mountLocalRoutes };
+module.exports = { driver, makeKey, mountLocalRoutes, canPreview };

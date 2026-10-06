@@ -10,7 +10,7 @@ let socket: Socket | null = null;
 
 // 서버가 보내주는 최신 상태를 보관 → 페이지를 옮겨도 빈 화면 없이 바로 표시
 const cache = new Map<string, unknown>();
-const SNAPSHOT_EVENTS = ['chat:history', 'kanban:state', 'calendar:state', 'team:state', 'datasets:state', 'meetings:state'];
+const SNAPSHOT_EVENTS = ['chat:history', 'kanban:state', 'calendar:state', 'team:state', 'datasets:state', 'meetings:state', 'works:state'];
 
 export function getSocket(): Socket {
   if (!socket) {

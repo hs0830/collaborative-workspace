@@ -7,6 +7,7 @@ export interface StoredFile {
   size: number;
   contentType: string;
   isImage: boolean;
+  uploaderId: string;
   uploaderName: string;
   createdAt: string;
 }
@@ -39,6 +40,7 @@ export interface KanbanTask {
   tag: Tag;
   statusId: string;
   dueDate: string; // YYYY-MM-DD 또는 ''
+  completedAt?: string; // 완료 컬럼에 들어간 시각 (ISO) 또는 ''
 }
 
 export interface KanbanState {
@@ -84,5 +86,39 @@ export type MeetingAction =
   | { type: 'meeting:add'; payload: { title: string; date: string; attendees: string[] } }
   | { type: 'meeting:update'; payload: { id: string; title?: string; date?: string; attendees?: string[] } }
   | { type: 'meeting:delete'; payload: { id: string } };
+
+export const WORK_CATEGORIES = ['코드', '문서', '발표자료', '실험결과', '디자인', '기타'] as const;
+export type WorkCategory = (typeof WORK_CATEGORIES)[number];
+
+/** 작업 기록 페이지에 올리는 개인 작업물 */
+export interface Work {
+  id: string;
+  ownerId: string;
+  title: string;
+  description: string;
+  category: WorkCategory;
+  visibility: 'team' | 'private';
+  fileId: string | null;
+  file: StoredFile | null;
+  linkUrl: string;
+  taskId: string | null; // 연결된 칸반 카드
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkInput {
+  title: string;
+  description: string;
+  category: WorkCategory;
+  visibility: 'team' | 'private';
+  linkUrl: string;
+  taskId: string | null;
+  fileId?: string | null; // 보낼 때만 파일 변경 (null = 파일 제거)
+}
+
+export type WorkAction =
+  | { type: 'work:add'; payload: WorkInput }
+  | { type: 'work:update'; payload: Partial<WorkInput> & { id: string } }
+  | { type: 'work:delete'; payload: { id: string } };
 
 export type { Member } from './auth';

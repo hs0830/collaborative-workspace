@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useCurrentUser, type Member } from '../../lib/auth';
 import { emitAction, useSynced } from '../../lib/socket';
 import { doneColumnId, useKanban } from '../../lib/useKanban';
@@ -218,7 +219,12 @@ function MemberModal({
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">📌 담당 업무 ({tasks.length})</h4>
+        <div className="flex justify-between items-center">
+          <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">📌 담당 업무 ({tasks.length})</h4>
+          <Link href={isMe ? '/work' : `/work?member=${member.id}`} className="text-[11px] text-blue-600 hover:underline">
+            🏅 작업 기록 보기 →
+          </Link>
+        </div>
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
           {sorted.length === 0 ? (
             <p className="text-xs text-gray-400 py-6 text-center border border-dashed dark:border-slate-700 rounded-lg">

@@ -88,3 +88,23 @@ create table if not exists meetings (
   updated_at  timestamptz not null default now()
 );
 alter table meetings enable row level security;
+
+-- 칸반 카드 완료 시각 (작업 기록용)
+alter table kanban_tasks add column if not exists completed_at timestamptz;
+
+-- 개인 작업물 (작업 기록 페이지)
+create table if not exists works (
+  id           text primary key,
+  owner_id     text not null,
+  title        text not null,
+  description  text not null default '',
+  category     text not null default '기타',
+  visibility   text not null default 'team',   -- 'team' | 'private'
+  file_id      text references files(id) on delete set null,
+  link_url     text not null default '',
+  task_id      text,                            -- 연결된 칸반 카드
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists works_owner on works (owner_id);
+alter table works enable row level security;

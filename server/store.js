@@ -27,6 +27,7 @@ const state = {
   files: new Map(), // id → { id, kind, storageKey, name, size, contentType, uploaderId, uploaderName, status, createdAt }
   chat: [], // { id, senderId, text, fileId, createdAt }
   meetings: [], // { id, title, date, attendees: string[], createdBy, preview, createdAt, updatedAt }
+  works: [], // { id, ownerId, title, description, category, visibility, fileId, linkUrl, taskId, createdAt, updatedAt }
 };
 
 // ───────────────────────── 초기화 ─────────────────────────
@@ -36,19 +37,21 @@ async function init() {
     return;
   }
 
-  const [m, c, t, e, f, ch, mt] = await Promise.all([
+  const [m, c, t, e, f, ch, mt, w] = await Promise.all([
     q('select id, name, role, email, color from members order by created_at'),
     q('select id, label, color from kanban_columns order by position'),
-    q('select id, title, assignee, tag, status_id, due_date from kanban_tasks order by created_at'),
+    q('select id, title, assignee, tag, status_id, due_date, completed_at from kanban_tasks order by created_at'),
     q('select id, title, date, assignee from calendar_events order by date, created_at'),
     q("select * from files where status = 'ready'"),
     q('select id, sender_id, text, file_id, created_at from chat_messages order by created_at desc limit $1', [MAX_CHAT_HISTORY]),
     q('select * from meetings order by date desc, created_at desc'),
+    q('select * from works order by created_at desc'),
   ]);
 
   state.members = m.rows;
   state.columns = c.rows;
-  state.tasks = t.rows.map((r) => ({ id: r.id, title: r.title, assignee: r.assignee, tag: r.tag, statusId: r.status_id, dueDate: r.due_date }));
+  state.tasks = t.rows.map((r) => ({ id: r.id, title: r.title, assignee: r.assignee, tag: r.tag, statusId: r.status_id, dueDate: r.due_date, completedAt: r.completed_at ? r.completed_at.toISOString() : '' }));
+  state.works = w.rows.map(workFromRow);
   state.events = e.rows;
   f.rows.forEach((r) => state.files.set(r.id, fileFromRow(r)));
   state.meetings = mt.rows.map(meetingFromRow);
@@ -73,8 +76,8 @@ function seedDemo() {
   state.tasks = [
     { id: newId(), title: '데이터셋 전처리 및 정제', assignee: '팀원 A', tag: 'AI', statusId: 'todo', dueDate: '' },
     { id: newId(), title: '실시간 WebSocket 연결', assignee: '팀원 B', tag: '백엔드', statusId: 'in_progress', dueDate: '' },
-    { id: newId(), title: 'Next.js 레이아웃 구축', assignee: '강현승', tag: '프론트엔드', statusId: 'done', dueDate: '' },
-  ];
+    { id: newId(), title: 'Next.js 레이아웃 구축', assignee: '강현승', tag: '프론트엔드', statusId: 'done', dueDate: '', completedAt: new Date().toISOString() },
+  ].map((t) => ({ completedAt: '', ...t }));
 }
 
 const fileFromRow = (r) => ({
@@ -176,6 +179,9 @@ async function addColumnRow(col) {
   state.columns.push(col);
 }
 
+/** '완료' 컬럼: id가 done 인 컬럼, 없으면 마지막 컬럼 (클라이언트 lib/useKanban.ts 와 같은 규칙) */
+const doneColumnId = () => state.columns.find((c) => c.id === 'done')?.id ?? state.columns[state.columns.length - 1]?.id;
+
 async function applyKanbanAction(action) {
   const p = action?.payload ?? {};
 
@@ -190,9 +196,11 @@ async function applyKanbanAction(action) {
         tag: TAGS.includes(p.tag) ? p.tag : '기타',
         statusId: state.columns.some((c) => c.id === p.statusId) ? p.statusId : state.columns[0].id,
         dueDate: dateOrEmpty(p.dueDate),
+        completedAt: '',
       };
-      await q('insert into kanban_tasks (id, title, assignee, tag, status_id, due_date) values ($1, $2, $3, $4, $5, $6)', [
-        task.id, task.title, task.assignee, task.tag, task.statusId, task.dueDate,
+      if (task.statusId === doneColumnId()) task.completedAt = new Date().toISOString();
+      await q('insert into kanban_tasks (id, title, assignee, tag, status_id, due_date, completed_at) values ($1, $2, $3, $4, $5, $6, $7)', [
+        task.id, task.title, task.assignee, task.tag, task.statusId, task.dueDate, task.completedAt || null,
       ]);
       state.tasks.push(task);
       return true;
@@ -206,8 +214,12 @@ async function applyKanbanAction(action) {
       if (p.tag !== undefined && TAGS.includes(p.tag)) next.tag = p.tag;
       if (p.dueDate !== undefined) next.dueDate = dateOrEmpty(p.dueDate);
       if (p.statusId !== undefined && state.columns.some((c) => c.id === p.statusId)) next.statusId = p.statusId;
-      await q('update kanban_tasks set title = $2, assignee = $3, tag = $4, status_id = $5, due_date = $6 where id = $1', [
-        t.id, next.title, next.assignee, next.tag, next.statusId, next.dueDate,
+      // 완료 컬럼에 들어가면 완료 시각 기록, 빠져나가면 지움
+      const done = doneColumnId();
+      if (next.statusId === done && t.statusId !== done) next.completedAt = new Date().toISOString();
+      if (next.statusId !== done) next.completedAt = '';
+      await q('update kanban_tasks set title = $2, assignee = $3, tag = $4, status_id = $5, due_date = $6, completed_at = $7 where id = $1', [
+        t.id, next.title, next.assignee, next.tag, next.statusId, next.dueDate, next.completedAt || null,
       ]);
       Object.assign(t, next);
       return true;
@@ -216,7 +228,9 @@ async function applyKanbanAction(action) {
       const idx = state.tasks.findIndex((x) => x.id === p.id);
       if (idx === -1) return false;
       await q('delete from kanban_tasks where id = $1', [p.id]);
+      await q('update works set task_id = null where task_id = $1', [p.id]);
       state.tasks.splice(idx, 1);
+      state.works.forEach((w) => w.taskId === p.id && (w.taskId = null));
       return true;
     }
     case 'column:add': {
@@ -307,6 +321,7 @@ async function deleteFile(id) {
   await q('delete from files where id = $1', [id]);
   state.files.delete(id);
   state.chat.forEach((m) => m.fileId === id && (m.fileId = null));
+  state.works.forEach((w) => w.fileId === id && (w.fileId = null));
 }
 
 const publicFile = (f) => ({
@@ -315,6 +330,7 @@ const publicFile = (f) => ({
   size: f.size,
   contentType: f.contentType,
   isImage: /^image\/(png|jpe?g|gif|webp)$/.test(f.contentType),
+  uploaderId: f.uploaderId,
   uploaderName: f.uploaderName,
   createdAt: f.createdAt,
 });
@@ -428,6 +444,110 @@ async function touchMeeting(id, preview) {
   return true;
 }
 
+// ───────────────────────── 작업 기록 (개인 작업물) ─────────────────────────
+const WORK_CATEGORIES = ['코드', '문서', '발표자료', '실험결과', '디자인', '기타'];
+
+const workFromRow = (r) => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  title: r.title,
+  description: r.description,
+  category: r.category,
+  visibility: r.visibility === 'private' ? 'private' : 'team',
+  fileId: r.file_id,
+  linkUrl: r.link_url,
+  taskId: r.task_id,
+  createdAt: new Date(r.created_at).toISOString(),
+  updatedAt: new Date(r.updated_at).toISOString(),
+});
+
+const cleanUrl = (v) => {
+  const u = str(v, 500);
+  return /^https?:\/\/[^\s]+$/i.test(u) ? u : '';
+};
+
+const getWork = (id) => state.works.find((w) => w.id === id) || null;
+const getWorkByFile = (fileId) => state.works.find((w) => w.fileId === fileId) || null;
+
+/** 이 사람이 볼 수 있는 작업물 (팀 공개 + 내 비공개), 파일 정보 포함 */
+function getWorksFor(memberId) {
+  return state.works
+    .filter((w) => w.visibility === 'team' || w.ownerId === memberId)
+    .map((w) => {
+      const f = w.fileId ? getFile(w.fileId) : null;
+      return { ...w, file: f && f.status === 'ready' ? publicFile(f) : null };
+    });
+}
+
+/** 작업물에 붙일 파일: 내가 올린, 업로드가 끝난, 작업물용 파일만 */
+const usableWorkFile = (fileId, member) => {
+  if (!fileId) return null;
+  const f = getFile(fileId);
+  return f && f.kind === 'work' && f.status === 'ready' && f.uploaderId === member.id ? f.id : null;
+};
+
+async function applyWorkAction(action, member) {
+  const p = action?.payload ?? {};
+  switch (action?.type) {
+    case 'work:add': {
+      const title = str(p.title, 100);
+      if (!title) return { ok: false, error: '제목을 입력하세요.' };
+      const now = new Date().toISOString();
+      const w = {
+        id: newId(),
+        ownerId: member.id,
+        title,
+        description: str(p.description, 2000),
+        category: WORK_CATEGORIES.includes(p.category) ? p.category : '기타',
+        visibility: p.visibility === 'private' ? 'private' : 'team',
+        fileId: usableWorkFile(p.fileId, member),
+        linkUrl: cleanUrl(p.linkUrl),
+        taskId: state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await q(
+        `insert into works (id, owner_id, title, description, category, visibility, file_id, link_url, task_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [w.id, w.ownerId, w.title, w.description, w.category, w.visibility, w.fileId, w.linkUrl, w.taskId]
+      );
+      state.works.unshift(w);
+      return { ok: true, id: w.id };
+    }
+    case 'work:update': {
+      const w = getWork(p.id);
+      if (!w || w.ownerId !== member.id) return { ok: false, error: '내 작업물만 수정할 수 있어요.' };
+      const next = {
+        title: p.title !== undefined ? str(p.title, 100) || w.title : w.title,
+        description: p.description !== undefined ? str(p.description, 2000) : w.description,
+        category: p.category !== undefined && WORK_CATEGORIES.includes(p.category) ? p.category : w.category,
+        visibility: p.visibility !== undefined ? (p.visibility === 'private' ? 'private' : 'team') : w.visibility,
+        linkUrl: p.linkUrl !== undefined ? cleanUrl(p.linkUrl) : w.linkUrl,
+        taskId: p.taskId !== undefined ? (state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null) : w.taskId,
+        // 새 파일로 바꿀 때만 fileId 를 보냄. null 이면 파일 제거
+        fileId: p.fileId !== undefined ? usableWorkFile(p.fileId, member) : w.fileId,
+      };
+      await q(
+        `update works set title=$2, description=$3, category=$4, visibility=$5, link_url=$6, task_id=$7, file_id=$8, updated_at=now()
+         where id=$1`,
+        [w.id, next.title, next.description, next.category, next.visibility, next.linkUrl, next.taskId, next.fileId]
+      );
+      const replacedFile = w.fileId && w.fileId !== next.fileId ? w.fileId : null;
+      Object.assign(w, next, { updatedAt: new Date().toISOString() });
+      return { ok: true, removedFileId: replacedFile };
+    }
+    case 'work:delete': {
+      const w = getWork(p.id);
+      if (!w || w.ownerId !== member.id) return { ok: false, error: '내 작업물만 삭제할 수 있어요.' };
+      await q('delete from works where id = $1', [w.id]);
+      state.works = state.works.filter((x) => x.id !== w.id);
+      return { ok: true, removedFileId: w.fileId };
+    }
+    default:
+      return { ok: false };
+  }
+}
+
 // ───────────────────────── 채팅 ─────────────────────────
 const SYSTEM_SENDER = { name: '시스템', color: '#6b7280' };
 
@@ -480,4 +600,6 @@ module.exports = {
   getChatHistory, addChatMessage,
   // 회의록
   getMeetings, getMeeting, applyMeetingAction, touchMeeting, meetingDocName,
+  // 작업 기록
+  getWorksFor, getWorkByFile, applyWorkAction,
 };

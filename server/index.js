@@ -66,10 +66,10 @@ app.get('/api/me', requireUser, (req, res) => res.json({ member: req.member }));
 // 3) GET  /api/files/:id/url     → 다운로드 링크 발급
 app.post('/api/files', requireUser, safe(async (req, res) => {
   const { kind, name, size, contentType } = req.body ?? {};
-  if (!['chat', 'dataset'].includes(kind)) return res.status(400).json({ error: '잘못된 요청입니다.' });
+  if (!['chat', 'dataset', 'work'].includes(kind)) return res.status(400).json({ error: '잘못된 요청입니다.' });
   const limit = config.limits[kind];
   if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: '빈 파일은 올릴 수 없습니다.' });
-  if (size > limit) return res.status(400).json({ error: `파일 용량은 최대 ${kind === 'chat' ? '20MB' : '1GB'}입니다.` });
+  if (size > limit) return res.status(400).json({ error: `파일 용량은 최대 ${{ chat: '20MB', dataset: '1GB', work: '100MB' }[kind]}입니다.` });
 
   const cleanName = String(name || 'file').replace(/[\\/\0]/g, '_').slice(0, 200);
   const type = typeof contentType === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(contentType) ? contentType : 'application/octet-stream';
@@ -105,7 +105,17 @@ app.post('/api/files/:id/complete', requireUser, safe(async (req, res) => {
 app.get('/api/files/:id/url', requireUser, safe(async (req, res) => {
   const file = store.getFile(req.params.id);
   if (!file || file.status !== 'ready') return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
-  res.json({ url: await storage.driver.downloadUrl(file, req.query.inline === '1') });
+
+  // '나만 보기' 작업물의 파일은 올린 사람만 받을 수 있음
+  if (file.kind === 'work') {
+    const work = store.getWorkByFile(file.id);
+    const visible = work ? work.visibility === 'team' || work.ownerId === req.member.id : file.uploaderId === req.member.id;
+    if (!visible) return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
+  }
+
+  // 브라우저에서 바로 보기는 이미지·PDF 만 허용 (그 외는 항상 다운로드)
+  const inline = req.query.inline === '1' && storage.canPreview(file.contentType);
+  res.json({ url: await storage.driver.downloadUrl(file, inline) });
 }));
 
 app.delete('/api/files/:id', requireUser, safe(async (req, res) => {
@@ -148,6 +158,7 @@ io.use((socket, next) => {
   next();
 });
 
+// 각 함수는 (받는 사람의 socket) 을 인자로 받음. 작업 기록은 사람마다 보이는 범위가 달라서 필요
 const SNAPSHOTS = {
   chat: () => ['chat:history', store.getChatHistory()],
   kanban: () => ['kanban:state', store.getKanban()],
@@ -155,6 +166,12 @@ const SNAPSHOTS = {
   team: () => ['team:state', store.getMembers()],
   datasets: () => ['datasets:state', store.listDatasets()],
   meetings: () => ['meetings:state', store.getMeetings()],
+  works: (socket) => ['works:state', store.getWorksFor(socket.data.memberId)],
+};
+
+/** 작업 기록은 사람마다 볼 수 있는 범위가 달라서 접속자마다 따로 보냄 */
+const broadcastWorks = () => {
+  for (const s of io.of('/').sockets.values()) s.emit(...SNAPSHOTS.works(s));
 };
 
 io.on('connection', (socket) => {
@@ -162,10 +179,10 @@ io.on('connection', (socket) => {
   const reply = (ack, value) => typeof ack === 'function' && ack(value);
 
   // 접속하자마자 현재 상태 전달
-  Object.values(SNAPSHOTS).forEach((snap) => socket.emit(...snap()));
+  Object.values(SNAPSHOTS).forEach((snap) => socket.emit(...snap(socket)));
 
   // 화면에 다시 들어왔을 때 최신 상태 요청 (예: sync:get 'kanban')
-  socket.on('sync:get', (name) => SNAPSHOTS[name] && socket.emit(...SNAPSHOTS[name]()));
+  socket.on('sync:get', (name) => SNAPSHOTS[name] && socket.emit(...SNAPSHOTS[name](socket)));
 
   /** 로그인 확인 → 직렬 실행 → 성공 시 해당 상태를 전체에 배포 */
   const handle = (event, apply, broadcast) =>
@@ -175,7 +192,7 @@ io.on('connection', (socket) => {
       try {
         const result = await serial(() => apply(payload, member));
         const ok = typeof result === 'object' && result !== null ? result.ok : Boolean(result);
-        if (ok) broadcast(result, payload);
+        if (ok) await broadcast(result, payload);
         reply(ack, typeof result === 'object' && result !== null ? result : { ok });
       } catch (err) {
         console.error(event, err);
@@ -193,6 +210,20 @@ io.on('connection', (socket) => {
   );
 
   handle('kanban:action', (action) => store.applyKanbanAction(action), () => io.emit(...SNAPSHOTS.kanban()));
+
+  handle(
+    'work:action',
+    (action, member) => store.applyWorkAction(action, member),
+    async (result) => {
+      // 작업물을 지우거나 파일을 바꾸면 이전 파일도 저장소에서 삭제
+      const old = result.removedFileId && store.getFile(result.removedFileId);
+      if (old) {
+        await storage.driver.remove(old);
+        await store.deleteFile(old.id);
+      }
+      broadcastWorks();
+    }
+  );
 
   handle('calendar:action', (action) => store.applyCalendarAction(action), () => io.emit(...SNAPSHOTS.calendar()));
 

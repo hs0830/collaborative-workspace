@@ -345,7 +345,13 @@ function CardBody({ task, actions, dragging }: { task: KanbanTask; actions?: Rea
       <div className="flex flex-wrap gap-1.5 items-center text-[10px]">
         <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold">{task.tag}</span>
         <span className="text-gray-400">👤 {task.assignee}</span>
-        {task.dueDate && <span className={overdue ? 'text-red-500 font-semibold' : 'text-gray-400'}>📅 {task.dueDate.slice(5)}</span>}
+        {task.completedAt ? (
+          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+            ✓ {new Date(task.completedAt).getMonth() + 1}/{new Date(task.completedAt).getDate()} 완료
+          </span>
+        ) : (
+          task.dueDate && <span className={overdue ? 'text-red-500 font-semibold' : 'text-gray-400'}>📅 {task.dueDate.slice(5)}</span>
+        )}
       </div>
       {actions && (
         <div className="pt-1.5 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between text-[10px]">{actions}</div>
