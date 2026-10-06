@@ -2,35 +2,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-body {
-  background-color: #FBFBFA;
-  color: #111827;
-  transition: background-color 0.2s ease, color 0.2s ease;
+/* 배경·글자색은 layout.tsx 의 body 클래스(bg-[#FBFBFA] dark:bg-slate-950 …)에서 지정합니다 */
+.dark {
+  color-scheme: dark; /* 스크롤바·날짜 선택기 등 브라우저 기본 UI도 어둡게 */
 }
 
-.dark body {
-  background-color: #0f172a;
-  color: #f8fafc;
+/* 커서 모양: Tailwind v4 는 버튼 기본 커서가 default 이므로 pointer 로 */
+button:not(:disabled),
+[role='button']:not(:disabled) {
+  cursor: pointer;
 }
 
-@layer base {
-  :root {
-    --bg-primary: #FBFBFA;
-    --text-primary: #111827;
-  }
-
-  .dark {
-    --bg-primary: #0f172a;
-    --text-primary: #f8fafc;
-    color-scheme: dark;
-  }
-
-  body {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-}
 /* ───────── 협업 에디터 (Tiptap) ───────── */
 .prose-editor h2 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.5rem; }
 .prose-editor h1 { font-size: 1.5rem; font-weight: 800; margin: 1rem 0 0.5rem; }

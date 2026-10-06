@@ -65,3 +65,13 @@ create table if not exists yjs_documents (
   state       bytea not null,
   updated_at  timestamptz not null default now()
 );
+
+-- Supabase 는 public 스키마 테이블을 자동 REST API 로도 열어 둡니다.
+-- RLS 를 켜고 정책을 만들지 않으면 그 경로는 전부 막히고, 이 서버(테이블 소유자 postgres 계정)만 접근합니다.
+alter table members          enable row level security;
+alter table kanban_columns   enable row level security;
+alter table kanban_tasks     enable row level security;
+alter table calendar_events  enable row level security;
+alter table files            enable row level security;
+alter table chat_messages    enable row level security;
+alter table yjs_documents    enable row level security;

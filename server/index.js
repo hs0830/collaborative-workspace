@@ -15,6 +15,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: config.allowedOrigins } });
 
+/** async 라우트에서 난 오류를 잡아 500 응답 (Express 4는 자동으로 잡지 않아 서버가 꺼질 수 있음) */
+const safe = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 app.set('trust proxy', 1); // Render 등 프록시 뒤에서 실제 IP 사용
 app.use(express.json({ limit: '100kb' }));
 
@@ -34,7 +37,7 @@ app.use((req, res, next) => {
 app.get('/health', (_req, res) => res.json({ ok: true, db: Boolean(db.pool), storage: storage.driver.name }));
 
 // ───────── 로그인 ─────────
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', safe(async (req, res) => {
   if (auth.tooManyAttempts(req.ip)) return res.status(429).json({ error: '잠시 후 다시 시도하세요.' });
 
   const { code, name } = req.body ?? {};
@@ -45,7 +48,7 @@ app.post('/api/login', async (req, res) => {
   if (!member) return res.status(400).json({ error: '이름을 확인하세요.' });
   broadcastTeam();
   res.json({ token: auth.signUserToken(member.id), member });
-});
+}));
 
 /** 로그인한 사용자만 통과 */
 function requireUser(req, res, next) {
@@ -61,7 +64,7 @@ app.get('/api/me', requireUser, (req, res) => res.json({ member: req.member }));
 // 1) POST /api/files            → 업로드 링크 발급 (브라우저가 이 링크로 직접 PUT)
 // 2) POST /api/files/:id/complete → 업로드 완료 확인
 // 3) GET  /api/files/:id/url     → 다운로드 링크 발급
-app.post('/api/files', requireUser, async (req, res) => {
+app.post('/api/files', requireUser, safe(async (req, res) => {
   const { kind, name, size, contentType } = req.body ?? {};
   if (!['chat', 'dataset'].includes(kind)) return res.status(400).json({ error: '잘못된 요청입니다.' });
   const limit = config.limits[kind];
@@ -80,9 +83,9 @@ app.post('/api/files', requireUser, async (req, res) => {
     uploader: req.member,
   });
   res.json({ fileId: file.id, uploadUrl: await storage.driver.uploadUrl(file), contentType: type });
-});
+}));
 
-app.post('/api/files/:id/complete', requireUser, async (req, res) => {
+app.post('/api/files/:id/complete', requireUser, safe(async (req, res) => {
   const file = store.getFile(req.params.id);
   if (!file || file.uploaderId !== req.member.id) return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
 
@@ -97,24 +100,34 @@ app.post('/api/files/:id/complete', requireUser, async (req, res) => {
   await store.markFileReady(file.id, size);
   if (file.kind === 'dataset') io.emit('datasets:state', store.listDatasets());
   res.json({ file: store.publicFile(file) });
-});
+}));
 
-app.get('/api/files/:id/url', requireUser, async (req, res) => {
+app.get('/api/files/:id/url', requireUser, safe(async (req, res) => {
   const file = store.getFile(req.params.id);
   if (!file || file.status !== 'ready') return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
   res.json({ url: await storage.driver.downloadUrl(file, req.query.inline === '1') });
-});
+}));
 
-app.delete('/api/files/:id', requireUser, async (req, res) => {
+app.delete('/api/files/:id', requireUser, safe(async (req, res) => {
   const file = store.getFile(req.params.id);
   if (!file || file.kind !== 'dataset') return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
   await storage.driver.remove(file);
   await store.deleteFile(file.id);
   io.emit('datasets:state', store.listDatasets());
   res.json({ ok: true });
-});
+}));
 
 storage.mountLocalRoutes(app, store);
+
+// 오류 처리 (위 라우트에서 난 오류가 여기로 옴)
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error('요청 처리 오류:', err.message);
+  if (!res.headersSent) res.status(err.status || 500).json({ error: err.status === 400 ? '잘못된 요청입니다.' : '서버 오류가 발생했습니다.' });
+});
+
+// 예상치 못한 오류로 서버 전체가 꺼지지 않도록 기록만 남김
+process.on('unhandledRejection', (err) => console.error('처리되지 않은 오류:', err));
 
 // ───────── 변경 작업은 한 번에 하나씩 처리 (동시 요청 시 데이터 꼬임 방지) ─────────
 let queue = Promise.resolve();
