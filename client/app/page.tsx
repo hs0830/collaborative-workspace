@@ -1,79 +1,81 @@
 'use client';
 
-import Link from 'next/link';
-
 export default function DashboardPage() {
-  // 예시 데이터: 팀원별 진행상황 및 역할
-  const teamMembers = [
-    { name: '강현승', role: '메인 개발 / 파이프라인 구축', progress: 85 },
-    { name: '팀원 A', role: '데이터셋 정제 및 전처리', progress: 60 },
-    { name: '팀원 B', role: 'UI/UX 디자인 및 프론트엔드', progress: 40 },
+  // 메인 통계 모의 데이터
+  const totalTasks = 12;
+  const completedTasks = 5;
+  const inProgressTasks = 4;
+  const todoTasks = 3;
+  const progressPercent = Math.round((completedTasks / totalTasks) * 100);
+
+  const teamDistribution = [
+    { name: '강현승', role: 'Full-Stack', tasks: 4, color: 'bg-blue-500' },
+    { name: '팀원 A', role: 'Data Eng', tasks: 3, color: 'bg-emerald-500' },
+    { name: '팀원 B', role: 'Backend', tasks: 3, color: 'bg-purple-500' },
+    { name: '팀원 C', role: 'UX / Doc', tasks: 2, color: 'bg-amber-500' },
   ];
 
-  const totalProgress = Math.round(
-    teamMembers.reduce((acc, cur) => acc + cur.progress, 0) / teamMembers.length
-  );
-
   return (
-    <div className="space-y-8">
-      <header className="border-b border-gray-200 pb-4">
-        <h1 className="text-2xl font-extrabold text-gray-900">📊 프로젝트 대시보드</h1>
-        <p className="text-xs text-gray-500 mt-1">
-          전체 프로젝트 진행률과 팀원별 달성 상황을 한눈에 점검하세요.
+    <div className="space-y-6">
+      <header className="border-b border-gray-200 dark:border-gray-800 pb-4">
+        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">📊 프로젝트 현황 대시보드</h1>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          팀 전체의 작업 달성률과 마감 임박 일정, 파트별 분담 비율을 확인하세요.
         </p>
       </header>
 
-      {/* 전체 프로젝트 진행률 바 */}
-      <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-xs space-y-3">
-        <div className="flex justify-between items-center">
-          <h2 className="font-bold text-gray-800 text-sm">팀 전체 프로젝트 진행률</h2>
-          <span className="text-lg font-extrabold text-blue-600">{totalProgress}%</span>
+      {/* 상단 4개 지표 카운터 카드 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">전체 진행률</span>
+          <div className="flex justify-between items-baseline">
+            <span className="text-2xl font-black text-gray-900 dark:text-white">{progressPercent}%</span>
+            <span className="text-xs text-blue-600 font-bold">{completedTasks}/{totalTasks} 완료</span>
+          </div>
+          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+          </div>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-          <div
-            className="bg-blue-600 h-3 rounded-full transition-all duration-500"
-            style={{ width: `${totalProgress}%` }}
-          />
-        </div>
-      </section>
 
-      {/* 팀원별 역할 및 진행률 카드 */}
-      <section className="space-y-3">
-        <h2 className="font-bold text-gray-800 text-sm">👥 팀원별 역할 및 진행 현황</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {teamMembers.map((member, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm">{member.name}</h3>
-                  <p className="text-[11px] text-gray-500">{member.role}</p>
-                </div>
-                <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
-                  {member.progress}%
-                </span>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-1">
+          <span className="text-xs text-amber-600 font-bold">📋 대기 중 카드</span>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{todoTasks}개</p>
+          <p className="text-[10px] text-gray-400">우선순위 지정 필요</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-1">
+          <span className="text-xs text-blue-600 font-bold">⚡ 진행 중 카드</span>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{inProgressTasks}개</p>
+          <p className="text-[10px] text-gray-400">실시간 진행 작업</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-1">
+          <span className="text-xs text-emerald-600 font-bold">✅ 완료된 카드</span>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{completedTasks}개</p>
+          <p className="text-[10px] text-gray-400">목표 달성</p>
+        </div>
+      </div>
+
+      {/* 팀원별 할당 작업 비중 그래프 */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-4">
+        <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">👥 팀원별 담당 과제 분담 현황</h3>
+        <div className="space-y-3">
+          {teamDistribution.map((member) => (
+            <div key={member.name} className="space-y-1">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-gray-800 dark:text-gray-200">{member.name} ({member.role})</span>
+                <span className="text-gray-500">{member.tasks}개 할당</span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
                 <div
-                  className="bg-emerald-500 h-2 rounded-full"
-                  style={{ width: `${member.progress}%` }}
+                  className={`${member.color} h-2.5 rounded-full transition-all duration-500`}
+                  style={{ width: `${(member.tasks / totalTasks) * 100}%` }}
                 />
               </div>
             </div>
           ))}
         </div>
-      </section>
-
-      {/* Quick Link 영역 */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link href="/editor" className="p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 transition">
-          <h3 className="font-bold text-xs text-gray-800">📝 실시간 문서 작업 진행</h3>
-          <p className="text-[11px] text-gray-400 mt-1">Tiptap 에디터로 회의록 및 사양서 편집</p>
-        </Link>
-        <Link href="/kanban" className="p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 transition">
-          <h3 className="font-bold text-xs text-gray-800">📋 칸반 보드로 업무 할당</h3>
-          <p className="text-[11px] text-gray-400 mt-1">새로운 태스크 생성 및 담당자 부여</p>
-        </Link>
-      </section>
+      </div>
     </div>
   );
 }

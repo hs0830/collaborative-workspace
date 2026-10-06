@@ -1,13 +1,33 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    color-scheme: light;
-  }
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 body {
-  background-color: #fbfbfa;
+  background-color: #FBFBFA;
   color: #111827;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark body {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+@layer base {
+  :root {
+    --bg-primary: #FBFBFA;
+    --text-primary: #111827;
+  }
+
+  .dark {
+    --bg-primary: #0f172a;
+    --text-primary: #f8fafc;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
 }
