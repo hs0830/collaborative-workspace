@@ -108,3 +108,7 @@ create table if not exists works (
 );
 create index if not exists works_owner on works (owner_id);
 alter table works enable row level security;
+
+-- 작업물 구분: 개인 작업물 / 팀 작업물(참여자와 역할 기록)
+alter table works add column if not exists section text not null default 'personal';   -- 'personal' | 'team'
+alter table works add column if not exists contributors text not null default '[]';    -- [{"name": "...", "role": "..."}]

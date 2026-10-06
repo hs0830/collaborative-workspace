@@ -106,13 +106,6 @@ app.get('/api/files/:id/url', requireUser, safe(async (req, res) => {
   const file = store.getFile(req.params.id);
   if (!file || file.status !== 'ready') return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
 
-  // '나만 보기' 작업물의 파일은 올린 사람만 받을 수 있음
-  if (file.kind === 'work') {
-    const work = store.getWorkByFile(file.id);
-    const visible = work ? work.visibility === 'team' || work.ownerId === req.member.id : file.uploaderId === req.member.id;
-    if (!visible) return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
-  }
-
   // 브라우저에서 바로 보기는 이미지·PDF 만 허용 (그 외는 항상 다운로드)
   const inline = req.query.inline === '1' && storage.canPreview(file.contentType);
   res.json({ url: await storage.driver.downloadUrl(file, inline) });
@@ -158,7 +151,6 @@ io.use((socket, next) => {
   next();
 });
 
-// 각 함수는 (받는 사람의 socket) 을 인자로 받음. 작업 기록은 사람마다 보이는 범위가 달라서 필요
 const SNAPSHOTS = {
   chat: () => ['chat:history', store.getChatHistory()],
   kanban: () => ['kanban:state', store.getKanban()],
@@ -166,12 +158,7 @@ const SNAPSHOTS = {
   team: () => ['team:state', store.getMembers()],
   datasets: () => ['datasets:state', store.listDatasets()],
   meetings: () => ['meetings:state', store.getMeetings()],
-  works: (socket) => ['works:state', store.getWorksFor(socket.data.memberId)],
-};
-
-/** 작업 기록은 사람마다 볼 수 있는 범위가 달라서 접속자마다 따로 보냄 */
-const broadcastWorks = () => {
-  for (const s of io.of('/').sockets.values()) s.emit(...SNAPSHOTS.works(s));
+  works: () => ['works:state', store.getWorks()],
 };
 
 io.on('connection', (socket) => {
@@ -179,10 +166,10 @@ io.on('connection', (socket) => {
   const reply = (ack, value) => typeof ack === 'function' && ack(value);
 
   // 접속하자마자 현재 상태 전달
-  Object.values(SNAPSHOTS).forEach((snap) => socket.emit(...snap(socket)));
+  Object.values(SNAPSHOTS).forEach((snap) => socket.emit(...snap()));
 
   // 화면에 다시 들어왔을 때 최신 상태 요청 (예: sync:get 'kanban')
-  socket.on('sync:get', (name) => SNAPSHOTS[name] && socket.emit(...SNAPSHOTS[name](socket)));
+  socket.on('sync:get', (name) => SNAPSHOTS[name] && socket.emit(...SNAPSHOTS[name]()));
 
   /** 로그인 확인 → 직렬 실행 → 성공 시 해당 상태를 전체에 배포 */
   const handle = (event, apply, broadcast) =>
@@ -221,7 +208,7 @@ io.on('connection', (socket) => {
         await storage.driver.remove(old);
         await store.deleteFile(old.id);
       }
-      broadcastWorks();
+      io.emit(...SNAPSHOTS.works());
     }
   );
 
@@ -233,6 +220,7 @@ io.on('connection', (socket) => {
     (_result, action) => {
       if (action?.type === 'meeting:delete') closeDoc(store.meetingDocName(action.payload?.id));
       io.emit(...SNAPSHOTS.meetings());
+      io.emit(...SNAPSHOTS.works());
     }
   );
 

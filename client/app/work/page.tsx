@@ -11,7 +11,7 @@ import { formatMeetingDate } from '../../lib/meetings';
 import type { KanbanTask, Meeting, StoredFile, Work, WorkAction, WorkInput } from '../../lib/types';
 import WorkForm from '../../components/WorkForm';
 
-type Kind = 'work' | 'task' | 'meeting' | 'dataset';
+type Kind = 'team' | 'personal' | 'task' | 'meeting' | 'dataset';
 
 interface Entry {
   key: string;
@@ -23,9 +23,10 @@ interface Entry {
   dataset?: StoredFile;
 }
 
-const KIND_LABEL: Record<Kind, string> = { work: '작업물', task: '완료한 카드', meeting: '회의', dataset: '데이터셋' };
+const KIND_LABEL: Record<Kind, string> = { team: '팀 작업물', personal: '개인 작업물', task: '완료한 카드', meeting: '회의', dataset: '데이터셋' };
 const KIND_STYLE: Record<Kind, string> = {
-  work: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  team: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  personal: 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   task: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   meeting: 'bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
   dataset: 'bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
@@ -68,9 +69,11 @@ function WorkRecords() {
   const entries = useMemo<Entry[]>(() => {
     if (!person) return [];
     const list: Entry[] = [];
-    (works ?? [])
-      .filter((w) => w.ownerId === person.id)
-      .forEach((w) => list.push({ key: `w-${w.id}`, kind: 'work', date: localDate(w.createdAt), work: w }));
+    (works ?? []).forEach((w) => {
+      const mine =
+        w.section === 'team' ? w.ownerId === person.id || w.contributors.some((c) => c.name === person.name) : w.ownerId === person.id;
+      if (mine) list.push({ key: `w-${w.id}`, kind: w.section, date: localDate(w.createdAt), work: w });
+    });
     allTasks
       .filter((t) => t.assignee === person.name && t.statusId === doneId)
       .forEach((t) => list.push({ key: `t-${t.id}`, kind: 'task', date: t.completedAt ? localDate(t.completedAt) : '', task: t }));
@@ -84,7 +87,7 @@ function WorkRecords() {
   }, [person, works, allTasks, doneId, meetings, datasets]);
 
   const counts = useMemo(() => {
-    const c: Record<Kind, number> = { work: 0, task: 0, meeting: 0, dataset: 0 };
+    const c: Record<Kind, number> = { team: 0, personal: 0, task: 0, meeting: 0, dataset: 0 };
     entries.forEach((e) => c[e.kind]++);
     return c;
   }, [entries]);
@@ -129,7 +132,7 @@ function WorkRecords() {
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">🏅 {isMe ? '내' : `${person.name}님의`} 작업 기록</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              올린 작업물과 완료한 카드, 참석한 회의, 올린 데이터셋이 자동으로 모여요.
+              팀 작업물에서 맡은 역할과 개인 작업물, 완료한 카드·참석한 회의·올린 데이터셋이 모여요.
             </p>
           </div>
         </div>
@@ -159,8 +162,8 @@ function WorkRecords() {
       </header>
 
       {/* 요약 + 필터 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-        {(['all', 'work', 'task', 'meeting', 'dataset'] as const).map((k) => {
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        {(['all', 'team', 'personal', 'task', 'meeting', 'dataset'] as const).map((k) => {
           const active = filter === k;
           const n = k === 'all' ? entries.length : counts[k];
           return (
@@ -202,8 +205,10 @@ function WorkRecords() {
                   <EntryCard
                     key={e.key}
                     entry={e}
-                    canEdit={isMe}
+                    personName={person.name}
+                    me={me}
                     tasks={allTasks}
+                    members={members}
                     onEdit={(w) => setEditing(w)}
                     onDelete={(w) =>
                       confirm(`'${w.title}' 작업물을 삭제할까요?${w.file ? '\n첨부한 파일도 함께 삭제됩니다.' : ''}`) &&
@@ -220,7 +225,8 @@ function WorkRecords() {
       {editing && (
         <WorkForm
           initial={editing === 'new' ? undefined : editing}
-          myName={me.name}
+          ownerName={editing === 'new' ? me.name : members.find((m) => m.id === editing.ownerId)?.name ?? me.name}
+          members={members}
           tasks={allTasks}
           onClose={() => setEditing(null)}
           onSubmit={(data: WorkInput) =>
@@ -234,14 +240,18 @@ function WorkRecords() {
 
 function EntryCard({
   entry,
-  canEdit,
+  personName,
+  me,
   tasks,
+  members,
   onEdit,
   onDelete,
 }: {
   entry: Entry;
-  canEdit: boolean;
+  personName: string; // 지금 보고 있는 사람
+  me: Member;
   tasks: KanbanTask[];
+  members: Member[];
   onEdit: (w: Work) => void;
   onDelete: (w: Work) => void;
 }) {
@@ -252,9 +262,13 @@ function EntryCard({
   const dateText = entry.date ? `${Number(entry.date.slice(5, 7))}/${Number(entry.date.slice(8))}` : '';
   const dateCol = <span className="w-10 shrink-0 text-xs font-semibold text-gray-400 pt-0.5">{dateText}</span>;
 
-  if (entry.kind === 'work' && entry.work) {
+  if ((entry.kind === 'team' || entry.kind === 'personal') && entry.work) {
     const w = entry.work;
     const linked = w.taskId ? tasks.find((t) => t.id === w.taskId) : null;
+    const owner = members.find((m) => m.id === w.ownerId);
+    const canEdit = w.ownerId === me.id || (w.section === 'team' && w.contributors.some((c) => c.name === me.name));
+    const canDelete = w.ownerId === me.id;
+    const colorOf = (name: string) => members.find((m) => m.name === name)?.color ?? '#9ca3af';
     return (
       <div className={card}>
         {dateCol}
@@ -262,10 +276,29 @@ function EntryCard({
           <div className="flex flex-wrap items-center gap-1.5">
             {badge}
             <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300">{w.category}</span>
-            {w.visibility === 'private' && <span className="text-[10px] text-gray-400">🔒 나만 보기</span>}
+            {w.section === 'team' && owner && <span className="text-[10px] text-gray-400">올린 사람 {owner.name}</span>}
           </div>
           <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100 break-words">{w.title}</h3>
           {w.description && <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">{w.description}</p>}
+          {w.section === 'team' && w.contributors.length > 0 && (
+            <ul className="rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-800 px-3 py-2 space-y-1">
+              {w.contributors.map((c) => {
+                const focus = c.name === personName;
+                return (
+                  <li key={c.name} className={`flex gap-2 text-[11px] ${focus ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <span className="flex items-center gap-1 w-20 shrink-0 truncate">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorOf(c.name) }} />
+                      {c.name}
+                    </span>
+                    <span className="break-words min-w-0">
+                      {c.role || <span className="text-gray-300 dark:text-slate-600 font-normal">역할 미입력</span>}
+                      {focus && <span className="ml-1.5 text-[10px] text-indigo-600 dark:text-indigo-300">← {personName === me.name ? '내' : `${personName}님`} 역할</span>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] pt-0.5">
             {w.file && (
               <button onClick={() => openFile(w.file!).catch((e) => alert(e.message))} className="text-blue-600 hover:underline text-left">
@@ -285,14 +318,18 @@ function EntryCard({
             {linked && <span className="text-gray-500">📋 {linked.title}</span>}
           </div>
         </div>
-        {canEdit && (
+        {(canEdit || canDelete) && (
           <div className="flex flex-col gap-1 text-[11px] shrink-0">
-            <button onClick={() => onEdit(w)} className="text-gray-500 hover:text-blue-600">
-              수정
-            </button>
-            <button onClick={() => onDelete(w)} className="text-red-400 hover:text-red-600">
-              삭제
-            </button>
+            {canEdit && (
+              <button onClick={() => onEdit(w)} className="text-gray-500 hover:text-blue-600">
+                수정
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => onDelete(w)} className="text-red-400 hover:text-red-600">
+                삭제
+              </button>
+            )}
           </div>
         )}
       </div>

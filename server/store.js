@@ -27,7 +27,7 @@ const state = {
   files: new Map(), // id → { id, kind, storageKey, name, size, contentType, uploaderId, uploaderName, status, createdAt }
   chat: [], // { id, senderId, text, fileId, createdAt }
   meetings: [], // { id, title, date, attendees: string[], createdBy, preview, createdAt, updatedAt }
-  works: [], // { id, ownerId, title, description, category, visibility, fileId, linkUrl, taskId, createdAt, updatedAt }
+  works: [], // { id, ownerId, section, title, description, category, contributors, fileId, linkUrl, taskId, createdAt, updatedAt }
 };
 
 // ───────────────────────── 초기화 ─────────────────────────
@@ -156,6 +156,7 @@ async function applyTeamAction(action) {
           mt.attendees = mt.attendees.map((a) => (a === oldName ? name : a));
           await q('update meetings set attendees = $2 where id = $1', [mt.id, JSON.stringify(mt.attendees)]);
         }
+        await renameContributor(oldName, name);
       }
       return { ok: true, renamed: oldName !== name };
     }
@@ -444,16 +445,20 @@ async function touchMeeting(id, preview) {
   return true;
 }
 
-// ───────────────────────── 작업 기록 (개인 작업물) ─────────────────────────
+// ───────────────────────── 작업 기록 (작업물) ─────────────────────────
+// 개인 작업물: 올린 사람이 맡아서 한 작업
+// 팀 작업물: 여러 명이 함께 만든 결과물. 참여자마다 맡은 역할을 기록해서 각자의 작업 기록에 표시
+// 모든 작업물은 팀 전체에 공개됩니다.
 const WORK_CATEGORIES = ['코드', '문서', '발표자료', '실험결과', '디자인', '기타'];
 
 const workFromRow = (r) => ({
   id: r.id,
   ownerId: r.owner_id,
+  section: r.section === 'team' ? 'team' : 'personal',
   title: r.title,
   description: r.description,
   category: r.category,
-  visibility: r.visibility === 'private' ? 'private' : 'team',
+  contributors: cleanContributors(safeJsonList(r.contributors)),
   fileId: r.file_id,
   linkUrl: r.link_url,
   taskId: r.task_id,
@@ -461,30 +466,60 @@ const workFromRow = (r) => ({
   updatedAt: new Date(r.updated_at).toISOString(),
 });
 
+function safeJsonList(text) {
+  try {
+    const v = JSON.parse(text);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 참여자 목록 정리: [{ name, role }] (이름 중복 제거, 최대 30명) */
+function cleanContributors(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const c of list) {
+    const name = str(c?.name, 20);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push({ name, role: str(c?.role, 200) });
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
 const cleanUrl = (v) => {
   const u = str(v, 500);
   return /^https?:\/\/[^\s]+$/i.test(u) ? u : '';
 };
 
 const getWork = (id) => state.works.find((w) => w.id === id) || null;
-const getWorkByFile = (fileId) => state.works.find((w) => w.fileId === fileId) || null;
 
-/** 이 사람이 볼 수 있는 작업물 (팀 공개 + 내 비공개), 파일 정보 포함 */
-function getWorksFor(memberId) {
-  return state.works
-    .filter((w) => w.visibility === 'team' || w.ownerId === memberId)
-    .map((w) => {
-      const f = w.fileId ? getFile(w.fileId) : null;
-      return { ...w, file: f && f.status === 'ready' ? publicFile(f) : null };
-    });
-}
+/** 작업물 목록 (파일 정보 포함) */
+const getWorks = () =>
+  state.works.map((w) => {
+    const f = w.fileId ? getFile(w.fileId) : null;
+    return { ...w, file: f && f.status === 'ready' ? publicFile(f) : null };
+  });
 
-/** 작업물에 붙일 파일: 내가 올린, 업로드가 끝난, 작업물용 파일만 */
+/** 작업물에 붙일 파일: 이 사람이 올린, 업로드가 끝난, 작업물용 파일만 */
 const usableWorkFile = (fileId, member) => {
   if (!fileId) return null;
   const f = getFile(fileId);
   return f && f.kind === 'work' && f.status === 'ready' && f.uploaderId === member.id ? f.id : null;
 };
+
+/** 올린 사람이거나 팀 작업물의 참여자면 수정 가능 */
+const canEditWork = (w, member) =>
+  w.ownerId === member.id || (w.section === 'team' && w.contributors.some((c) => c.name === member.name));
+
+/** 팀 작업물에는 올린 사람이 항상 참여자로 들어가도록 */
+function withOwner(contributors, ownerName) {
+  if (contributors.some((c) => c.name === ownerName)) return contributors;
+  return [{ name: ownerName, role: '' }, ...contributors];
+}
 
 async function applyWorkAction(action, member) {
   const p = action?.payload ?? {};
@@ -492,14 +527,16 @@ async function applyWorkAction(action, member) {
     case 'work:add': {
       const title = str(p.title, 100);
       if (!title) return { ok: false, error: '제목을 입력하세요.' };
+      const section = p.section === 'team' ? 'team' : 'personal';
       const now = new Date().toISOString();
       const w = {
         id: newId(),
         ownerId: member.id,
+        section,
         title,
         description: str(p.description, 2000),
         category: WORK_CATEGORIES.includes(p.category) ? p.category : '기타',
-        visibility: p.visibility === 'private' ? 'private' : 'team',
+        contributors: section === 'team' ? withOwner(cleanContributors(p.contributors), member.name) : [],
         fileId: usableWorkFile(p.fileId, member),
         linkUrl: cleanUrl(p.linkUrl),
         taskId: state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null,
@@ -507,30 +544,36 @@ async function applyWorkAction(action, member) {
         updatedAt: now,
       };
       await q(
-        `insert into works (id, owner_id, title, description, category, visibility, file_id, link_url, task_id)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [w.id, w.ownerId, w.title, w.description, w.category, w.visibility, w.fileId, w.linkUrl, w.taskId]
+        `insert into works (id, owner_id, section, title, description, category, contributors, file_id, link_url, task_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [w.id, w.ownerId, w.section, w.title, w.description, w.category, JSON.stringify(w.contributors), w.fileId, w.linkUrl, w.taskId]
       );
       state.works.unshift(w);
       return { ok: true, id: w.id };
     }
     case 'work:update': {
       const w = getWork(p.id);
-      if (!w || w.ownerId !== member.id) return { ok: false, error: '내 작업물만 수정할 수 있어요.' };
+      if (!w || !canEditWork(w, member)) return { ok: false, error: '올린 사람이나 참여자만 수정할 수 있어요.' };
+      const ownerName = getMember(w.ownerId)?.name ?? member.name;
+      const section = p.section !== undefined ? (p.section === 'team' ? 'team' : 'personal') : w.section;
       const next = {
+        section,
         title: p.title !== undefined ? str(p.title, 100) || w.title : w.title,
         description: p.description !== undefined ? str(p.description, 2000) : w.description,
         category: p.category !== undefined && WORK_CATEGORIES.includes(p.category) ? p.category : w.category,
-        visibility: p.visibility !== undefined ? (p.visibility === 'private' ? 'private' : 'team') : w.visibility,
+        contributors:
+          section === 'team'
+            ? withOwner(p.contributors !== undefined ? cleanContributors(p.contributors) : w.contributors, ownerName)
+            : [],
         linkUrl: p.linkUrl !== undefined ? cleanUrl(p.linkUrl) : w.linkUrl,
         taskId: p.taskId !== undefined ? (state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null) : w.taskId,
         // 새 파일로 바꿀 때만 fileId 를 보냄. null 이면 파일 제거
         fileId: p.fileId !== undefined ? usableWorkFile(p.fileId, member) : w.fileId,
       };
       await q(
-        `update works set title=$2, description=$3, category=$4, visibility=$5, link_url=$6, task_id=$7, file_id=$8, updated_at=now()
+        `update works set section=$2, title=$3, description=$4, category=$5, contributors=$6, link_url=$7, task_id=$8, file_id=$9, updated_at=now()
          where id=$1`,
-        [w.id, next.title, next.description, next.category, next.visibility, next.linkUrl, next.taskId, next.fileId]
+        [w.id, next.section, next.title, next.description, next.category, JSON.stringify(next.contributors), next.linkUrl, next.taskId, next.fileId]
       );
       const replacedFile = w.fileId && w.fileId !== next.fileId ? w.fileId : null;
       Object.assign(w, next, { updatedAt: new Date().toISOString() });
@@ -538,13 +581,22 @@ async function applyWorkAction(action, member) {
     }
     case 'work:delete': {
       const w = getWork(p.id);
-      if (!w || w.ownerId !== member.id) return { ok: false, error: '내 작업물만 삭제할 수 있어요.' };
+      if (!w || w.ownerId !== member.id) return { ok: false, error: '올린 사람만 삭제할 수 있어요.' };
       await q('delete from works where id = $1', [w.id]);
       state.works = state.works.filter((x) => x.id !== w.id);
       return { ok: true, removedFileId: w.fileId };
     }
     default:
       return { ok: false };
+  }
+}
+
+/** 팀원 이름이 바뀌면 팀 작업물 참여자 이름도 변경 */
+async function renameContributor(oldName, newName) {
+  for (const w of state.works) {
+    if (!w.contributors.some((c) => c.name === oldName)) continue;
+    w.contributors = w.contributors.map((c) => (c.name === oldName ? { ...c, name: newName } : c));
+    await q('update works set contributors = $2 where id = $1', [w.id, JSON.stringify(w.contributors)]);
   }
 }
 
@@ -601,5 +653,5 @@ module.exports = {
   // 회의록
   getMeetings, getMeeting, applyMeetingAction, touchMeeting, meetingDocName,
   // 작업 기록
-  getWorksFor, getWorkByFile, applyWorkAction,
+  getWorks, applyWorkAction,
 };

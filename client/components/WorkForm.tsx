@@ -1,8 +1,17 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { Member } from '../lib/auth';
 import { formatSize, LIMITS, uploadFile } from '../lib/files';
-import { WORK_CATEGORIES, type KanbanTask, type Work, type WorkCategory, type WorkInput } from '../lib/types';
+import {
+  WORK_CATEGORIES,
+  type Contributor,
+  type KanbanTask,
+  type Work,
+  type WorkCategory,
+  type WorkInput,
+  type WorkSection,
+} from '../lib/types';
 
 const inputCls =
   'w-full border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100 rounded-lg p-2.5 outline-none focus:border-blue-500';
@@ -10,23 +19,33 @@ const inputCls =
 /** 작업물 올리기·수정 창 */
 export default function WorkForm({
   initial,
-  myName,
+  ownerName,
+  members,
   tasks,
   onClose,
   onSubmit,
 }: {
   initial?: Work;
-  myName: string;
+  /** 작업물을 올린 사람 (새로 올릴 때는 나) */
+  ownerName: string;
+  members: Member[];
   tasks: KanbanTask[];
   onClose: () => void;
   onSubmit: (data: WorkInput) => Promise<boolean>;
 }) {
+  const [section, setSection] = useState<WorkSection>(initial?.section ?? 'personal');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState<WorkCategory>(initial?.category ?? '문서');
-  const [isPrivate, setIsPrivate] = useState(initial?.visibility === 'private');
   const [linkUrl, setLinkUrl] = useState(initial?.linkUrl ?? '');
   const [taskId, setTaskId] = useState(initial?.taskId ?? '');
+
+  // 팀 작업물 참여자: 이름 → 맡은 역할. 올린 사람은 항상 포함
+  const [roles, setRoles] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = { [ownerName]: '' };
+    initial?.contributors.forEach((c) => (init[c.name] = c.role));
+    return init;
+  });
 
   // 파일: 기존 파일 유지 / 새 파일 선택 / 파일 제거
   const [file, setFile] = useState<File | null>(null);
@@ -37,8 +56,19 @@ export default function WorkForm({
 
   const existing = !removeFile && !file ? initial?.file : null;
 
-  // 내 카드 먼저, 나머지는 뒤에
-  const sortedTasks = [...tasks].sort((a, b) => Number(b.assignee === myName) - Number(a.assignee === myName));
+  // 올린 사람 → 등록된 팀원 → 팀원 목록에 없는 기존 참여자 순
+  const names = [...new Set([ownerName, ...members.map((m) => m.name), ...Object.keys(roles)])];
+  const toggle = (n: string) =>
+    setRoles((prev) => {
+      if (n === ownerName) return prev;
+      const next = { ...prev };
+      if (n in next) delete next[n];
+      else next[n] = '';
+      return next;
+    });
+
+  // 담당자가 나인 카드를 먼저
+  const sortedTasks = [...tasks].sort((a, b) => Number(b.assignee === ownerName) - Number(a.assignee === ownerName));
 
   const pickFile = (f: File | undefined) => {
     if (!f) return;
@@ -58,11 +88,14 @@ export default function WorkForm({
     if (!title.trim() || linkInvalid) return;
     setSaving(true);
     try {
+      const contributors: Contributor[] =
+        section === 'team' ? names.filter((n) => n in roles).map((n) => ({ name: n, role: roles[n].trim() })) : [];
       const data: WorkInput = {
+        section,
         title: title.trim(),
         description: description.trim(),
         category,
-        visibility: isPrivate ? 'private' : 'team',
+        contributors,
         linkUrl: linkUrl.trim(),
         taskId: taskId || null,
       };
@@ -91,7 +124,31 @@ export default function WorkForm({
       >
         <div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">{initial ? '✏️ 작업물 수정' : '📤 작업물 올리기'}</h3>
-          <p className="text-[11px] text-gray-400 mt-1">무엇을, 왜 했는지 적어 두면 나중에 포트폴리오를 쓸 때 큰 도움이 돼요.</p>
+          <p className="text-[11px] text-gray-400 mt-1">무엇을, 왜 했는지 적어 두면 나중에 포트폴리오나 발표에서 역할을 설명하기 쉬워요.</p>
+        </div>
+
+        {/* 구분 */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {(
+            [
+              ['personal', '🙋 개인 작업물', '내가 맡아서 한 작업'],
+              ['team', '🤝 팀 작업물', '여러 명이 함께 만든 결과물'],
+            ] as const
+          ).map(([value, label, desc]) => (
+            <button
+              type="button"
+              key={value}
+              onClick={() => setSection(value)}
+              className={`text-left rounded-xl border p-3 transition ${
+                section === value
+                  ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/40'
+                  : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
+              }`}
+            >
+              <p className="font-bold text-gray-800 dark:text-gray-100">{label}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{desc}</p>
+            </button>
+          ))}
         </div>
 
         <div className="space-y-3 text-xs">
@@ -145,20 +202,67 @@ export default function WorkForm({
 
           <label className="block space-y-1">
             <span className="font-semibold text-gray-700 dark:text-gray-300">제목</span>
-            <input required maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 중간발표 슬라이드, 전처리 파이프라인 v2" className={inputCls} />
+            <input
+              required
+              maxLength={100}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={section === 'team' ? '예: 최종 발표 자료, 중간 보고서' : '예: 전처리 파이프라인 v2, 실험 결과 정리'}
+              className={inputCls}
+            />
           </label>
 
           <label className="block space-y-1">
             <span className="font-semibold text-gray-700 dark:text-gray-300">설명</span>
             <textarea
-              rows={4}
+              rows={3}
               maxLength={2000}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={'무엇을 했고, 왜 했고, 결과가 어땠는지\n예: DICOM 이미지를 NIfTI로 변환하는 스크립트 작성. 수작업 대비 처리 시간을 3시간 → 10분으로 줄임.'}
+              placeholder={'무엇을 했고, 왜 했고, 결과가 어땠는지\n예: DICOM 이미지를 NIfTI로 변환하는 스크립트 작성. 처리 시간을 3시간 → 10분으로 줄임.'}
               className={`${inputCls} resize-y leading-relaxed`}
             />
           </label>
+
+          {/* 팀 작업물: 참여자와 역할 */}
+          {section === 'team' && (
+            <div className="space-y-1.5">
+              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                참여자와 맡은 역할 ({Object.keys(roles).length}명)
+              </span>
+              <div className="rounded-lg border border-gray-200 dark:border-slate-700 divide-y divide-gray-100 dark:divide-slate-800">
+                {names.map((n) => {
+                  const on = n in roles;
+                  return (
+                    <div key={n} className="flex items-center gap-2 p-2">
+                      <label className="flex items-center gap-1.5 w-24 shrink-0 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          disabled={n === ownerName}
+                          onChange={() => toggle(n)}
+                          className="w-3.5 h-3.5 accent-blue-600"
+                        />
+                        <span className={`truncate ${on ? 'text-gray-800 dark:text-gray-100 font-medium' : 'text-gray-400'}`}>{n}</span>
+                      </label>
+                      {on ? (
+                        <input
+                          value={roles[n]}
+                          maxLength={200}
+                          onChange={(e) => setRoles((prev) => ({ ...prev, [n]: e.target.value }))}
+                          placeholder="맡은 역할 (예: 실험 결과 슬라이드 5~9)"
+                          className="flex-1 min-w-0 text-xs border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-gray-100 rounded-md px-2 py-1.5 outline-none focus:border-blue-500"
+                        />
+                      ) : (
+                        <span className="text-[11px] text-gray-300 dark:text-slate-600">참여하지 않음</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-400">참여자 모두의 작업 기록에 표시되고, 참여자라면 누구나 내용을 고칠 수 있어요.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block space-y-1">
@@ -176,7 +280,7 @@ export default function WorkForm({
                 {sortedTasks.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.title}
-                    {t.assignee === myName ? '' : ` (${t.assignee})`}
+                    {t.assignee === ownerName ? '' : ` (${t.assignee})`}
                   </option>
                 ))}
               </select>
@@ -192,12 +296,6 @@ export default function WorkForm({
               className={`${inputCls} ${linkInvalid ? '!border-red-400' : ''}`}
             />
             {linkInvalid && <span className="text-[11px] text-red-500">https:// 로 시작하는 주소를 넣어 주세요.</span>}
-          </label>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-            <span className="text-gray-700 dark:text-gray-300">🔒 나만 보기</span>
-            <span className="text-[11px] text-gray-400">(체크하지 않으면 팀원 모두가 볼 수 있어요)</span>
           </label>
         </div>
 

@@ -90,14 +90,23 @@ export type MeetingAction =
 export const WORK_CATEGORIES = ['코드', '문서', '발표자료', '실험결과', '디자인', '기타'] as const;
 export type WorkCategory = (typeof WORK_CATEGORIES)[number];
 
-/** 작업 기록 페이지에 올리는 개인 작업물 */
+export type WorkSection = 'personal' | 'team';
+
+/** 팀 작업물 참여자와 맡은 역할 */
+export interface Contributor {
+  name: string;
+  role: string;
+}
+
+/** 작업 기록 페이지에 올리는 작업물 (모두 팀 전체 공개) */
 export interface Work {
   id: string;
   ownerId: string;
+  section: WorkSection; // personal: 내가 맡아서 한 작업, team: 여럿이 함께 만든 결과물
   title: string;
   description: string;
   category: WorkCategory;
-  visibility: 'team' | 'private';
+  contributors: Contributor[]; // team 일 때만
   fileId: string | null;
   file: StoredFile | null;
   linkUrl: string;
@@ -107,10 +116,11 @@ export interface Work {
 }
 
 export interface WorkInput {
+  section: WorkSection;
   title: string;
   description: string;
   category: WorkCategory;
-  visibility: 'team' | 'private';
+  contributors: Contributor[];
   linkUrl: string;
   taskId: string | null;
   fileId?: string | null; // 보낼 때만 파일 변경 (null = 파일 제거)
