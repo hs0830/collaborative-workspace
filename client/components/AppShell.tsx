@@ -13,6 +13,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isLoginPage = pathname === '/login';
 
+  // 파일을 업로드 영역 밖에 떨어뜨리면 브라우저가 그 파일을 열거나 다운로드해 버리므로 막음
+  // (텍스트 끌어다 놓기는 그대로 두고, 파일일 때만)
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+    };
+    window.addEventListener('dragover', block);
+    window.addEventListener('drop', block);
+    return () => {
+      window.removeEventListener('dragover', block);
+      window.removeEventListener('drop', block);
+    };
+  }, []);
+
   useEffect(() => {
     if (session === undefined) return; // 아직 확인 전
     if (!session && !isLoginPage) {

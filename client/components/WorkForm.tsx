@@ -120,6 +120,12 @@ export default function WorkForm({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
+        // 창 안 어디에 파일을 놓아도 첨부
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (!saving) pickFile(e.dataTransfer.files?.[0]);
+        }}
         className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         <div>
@@ -154,11 +160,6 @@ export default function WorkForm({
         <div className="space-y-3 text-xs">
           {/* 파일 */}
           <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              pickFile(e.dataTransfer.files?.[0]);
-            }}
             className="rounded-lg border-2 border-dashed border-gray-200 dark:border-slate-700 p-3 text-center space-y-1"
           >
             <input type="file" ref={fileRef} className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? undefined)} />
@@ -171,7 +172,7 @@ export default function WorkForm({
                 📎 {existing.name} <span className="text-gray-400">({formatSize(existing.size)})</span>
               </p>
             ) : (
-              <p className="text-gray-400">파일을 끌어다 놓거나 선택하세요 (PPT, PDF, Word, 코드, 이미지 등 · 최대 1GB)</p>
+              <p className="text-gray-400">이 창에 파일을 끌어다 놓거나 선택하세요 (PPT, PDF, Word, 코드, 이미지 등 · 최대 1GB)</p>
             )}
             <div className="flex justify-center gap-3">
               <button type="button" onClick={() => fileRef.current?.click()} className="text-blue-600 hover:underline">
