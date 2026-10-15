@@ -73,7 +73,7 @@ export default function WorkForm({
   const pickFile = (f: File | undefined) => {
     if (!f) return;
     if (f.size > LIMITS.work) {
-      alert('작업물 파일은 최대 100MB까지 올릴 수 있어요.\n더 큰 데이터는 "대용량 데이터셋"에 올려 주세요.');
+      alert('작업물 파일은 최대 1GB까지 올릴 수 있어요.');
       return;
     }
     setFile(f);
@@ -171,7 +171,7 @@ export default function WorkForm({
                 📎 {existing.name} <span className="text-gray-400">({formatSize(existing.size)})</span>
               </p>
             ) : (
-              <p className="text-gray-400">파일을 끌어다 놓거나 선택하세요 (PPT, PDF, Word, 코드, 이미지 등 · 최대 100MB)</p>
+              <p className="text-gray-400">파일을 끌어다 놓거나 선택하세요 (PPT, PDF, Word, 코드, 이미지 등 · 최대 1GB)</p>
             )}
             <div className="flex justify-center gap-3">
               <button type="button" onClick={() => fileRef.current?.click()} className="text-blue-600 hover:underline">

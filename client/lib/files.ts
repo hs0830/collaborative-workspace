@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { api, getToken } from './auth';
 import type { StoredFile } from './types';
 
-export const LIMITS = { chat: 20 * 1024 * 1024, dataset: 1024 * 1024 * 1024, work: 100 * 1024 * 1024 } as const;
-const LIMIT_LABEL = { chat: '20MB', dataset: '1GB', work: '100MB' } as const;
+export const LIMITS = { chat: 20 * 1024 * 1024, dataset: 1024 * 1024 * 1024, work: 1024 * 1024 * 1024 } as const;
+const LIMIT_LABEL = { chat: '20MB', dataset: '1GB', work: '1GB' } as const;
 
 type FileKind = keyof typeof LIMITS;
 

@@ -69,7 +69,7 @@ app.post('/api/files', requireUser, safe(async (req, res) => {
   if (!['chat', 'dataset', 'work'].includes(kind)) return res.status(400).json({ error: '잘못된 요청입니다.' });
   const limit = config.limits[kind];
   if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: '빈 파일은 올릴 수 없습니다.' });
-  if (size > limit) return res.status(400).json({ error: `파일 용량은 최대 ${{ chat: '20MB', dataset: '1GB', work: '100MB' }[kind]}입니다.` });
+  if (size > limit) return res.status(400).json({ error: `파일 용량은 최대 ${{ chat: '20MB', dataset: '1GB', work: '1GB' }[kind]}입니다.` });
 
   const cleanName = String(name || 'file').replace(/[\\/\0]/g, '_').slice(0, 200);
   const type = typeof contentType === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(contentType) ? contentType : 'application/octet-stream';
