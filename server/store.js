@@ -27,6 +27,7 @@ const state = {
   files: new Map(), // id → { id, kind, storageKey, name, size, contentType, uploaderId, uploaderName, status, createdAt }
   chat: [], // { id, senderId, text, fileId, createdAt }
   meetings: [], // { id, title, date, attendees: string[], createdBy, preview, createdAt, updatedAt }
+  progress: [], // { memberId, date, label, text, updatedAt }  (날짜 오름차순)
   works: [], // { id, ownerId, section, title, description, category, contributors, fileId, linkUrl, taskId, createdAt, updatedAt }
 };
 
@@ -37,7 +38,7 @@ async function init() {
     return;
   }
 
-  const [m, c, t, e, f, ch, mt, w] = await Promise.all([
+  const [m, c, t, e, f, ch, mt, w, pg] = await Promise.all([
     q('select id, name, role, email, color from members order by created_at'),
     q('select id, label, color from kanban_columns order by position'),
     q('select id, title, assignee, tag, status_id, due_date, completed_at from kanban_tasks order by created_at'),
@@ -46,12 +47,14 @@ async function init() {
     q('select id, sender_id, text, file_id, created_at from chat_messages order by created_at desc limit $1', [MAX_CHAT_HISTORY]),
     q('select * from meetings order by date desc, created_at desc'),
     q('select * from works order by created_at desc'),
+    q('select * from progress_logs order by date'),
   ]);
 
   state.members = m.rows;
   state.columns = c.rows;
   state.tasks = t.rows.map((r) => ({ id: r.id, title: r.title, assignee: r.assignee, tag: r.tag, statusId: r.status_id, dueDate: r.due_date, completedAt: r.completed_at ? r.completed_at.toISOString() : '' }));
   state.works = w.rows.map(workFromRow);
+  state.progress = pg.rows.map((r) => ({ memberId: r.member_id, date: r.date, label: r.label, text: r.text, updatedAt: new Date(r.updated_at).toISOString() }));
   state.events = e.rows;
   f.rows.forEach((r) => state.files.set(r.id, fileFromRow(r)));
   state.meetings = mt.rows.map(meetingFromRow);
@@ -600,6 +603,55 @@ async function renameContributor(oldName, newName) {
   }
 }
 
+// ───────────────────────── 진행 현황 ─────────────────────────
+// 팀원마다 하루 한 행: 그날의 핵심 작업. 팀원 누구나 모든 팀원의 기록을 쓰고 고칠 수 있습니다.
+// 오늘 이후 날짜는 화면에서 '예정'으로 표시됩니다.
+const getProgress = () => state.progress;
+const sortProgress = () => state.progress.sort((a, b) => a.date.localeCompare(b.date));
+const findLog = (memberId, date) => state.progress.find((e) => e.memberId === memberId && e.date === date);
+
+async function applyProgressAction(action, member) {
+  const p = action?.payload ?? {};
+  const date = dateOrEmpty(p.date);
+  if (!date) return { ok: false, error: '날짜를 확인하세요.' };
+  // 누구의 표인지 (안 보내면 내 표)
+  const owner = p.memberId ? getMember(p.memberId) : member;
+  if (!owner) return { ok: false, error: '팀원을 찾을 수 없어요.' };
+
+  switch (action?.type) {
+    case 'progress:save': {
+      const label = str(p.label, 60);
+      const text = str(p.text, 2000);
+      if (!label && !text) return { ok: false, error: '내용을 입력하세요.' };
+      // 날짜를 바꾼 경우 예전 날짜의 내 기록을 옮김
+      const from = dateOrEmpty(p.fromDate);
+      if (from && from !== date) {
+        if (findLog(owner.id, date)) return { ok: false, error: '그 날짜에는 이미 기록이 있어요.' };
+        await q('delete from progress_logs where member_id = $1 and date = $2', [owner.id, from]);
+        state.progress = state.progress.filter((e) => !(e.memberId === owner.id && e.date === from));
+      }
+      await q(
+        `insert into progress_logs (member_id, date, label, text, updated_at) values ($1, $2, $3, $4, now())
+         on conflict (member_id, date) do update set label = excluded.label, text = excluded.text, updated_at = now()`,
+        [owner.id, date, label, text]
+      );
+      const entry = { memberId: owner.id, date, label, text, updatedAt: new Date().toISOString() };
+      state.progress = state.progress.filter((e) => !(e.memberId === owner.id && e.date === date));
+      state.progress.push(entry);
+      sortProgress();
+      return { ok: true };
+    }
+    case 'progress:delete': {
+      if (!findLog(owner.id, date)) return { ok: false };
+      await q('delete from progress_logs where member_id = $1 and date = $2', [owner.id, date]);
+      state.progress = state.progress.filter((e) => !(e.memberId === owner.id && e.date === date));
+      return { ok: true };
+    }
+    default:
+      return { ok: false };
+  }
+}
+
 // ───────────────────────── 채팅 ─────────────────────────
 const SYSTEM_SENDER = { name: '시스템', color: '#6b7280' };
 
@@ -654,4 +706,6 @@ module.exports = {
   getMeetings, getMeeting, applyMeetingAction, touchMeeting, meetingDocName,
   // 작업 기록
   getWorks, applyWorkAction,
+  // 진행 현황
+  getProgress, applyProgressAction,
 };

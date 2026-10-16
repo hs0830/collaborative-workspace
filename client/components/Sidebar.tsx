@@ -11,6 +11,7 @@ import { daysUntil, todayStr } from '../lib/date';
 
 const navItems = [
   { name: '대시보드', href: '/', icon: '📊' },
+  { name: '진행 현황', href: '/progress', icon: '📈' },
   { name: '팀원 관리', href: '/team', icon: '👥' },
   { name: '작업 기록', href: '/work', icon: '🏅' },
   { name: '실시간 문서', href: '/editor', icon: '📝' },

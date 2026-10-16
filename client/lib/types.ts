@@ -131,4 +131,17 @@ export type WorkAction =
   | { type: 'work:update'; payload: Partial<WorkInput> & { id: string } }
   | { type: 'work:delete'; payload: { id: string } };
 
+/** 진행 현황: 팀원마다 하루 한 행 */
+export interface ProgressEntry {
+  memberId: string;
+  date: string; // YYYY-MM-DD
+  label: string; // 굵게 표시할 구분 (선택)
+  text: string; // 핵심 작업
+  updatedAt: string;
+}
+
+export type ProgressAction =
+  | { type: 'progress:save'; payload: { memberId: string; date: string; label: string; text: string; fromDate?: string } }
+  | { type: 'progress:delete'; payload: { memberId: string; date: string } };
+
 export type { Member } from './auth';

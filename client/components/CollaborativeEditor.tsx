@@ -152,8 +152,11 @@ function EditorShell({
     const a = document.createElement('a');
     a.href = url;
     a.download = `${(options.exportName || `workspace-doc-${new Date().toISOString().slice(0, 10)}`).replace(/[\\/:*?"<>|]/g, '_')}.md`;
+    // 링크를 문서에 붙였다가 떼고, 다운로드가 시작된 뒤에 해제 (바로 해제하면 파일 이름이 사라짐)
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const statusLabel = {

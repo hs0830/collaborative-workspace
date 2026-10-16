@@ -112,3 +112,14 @@ alter table works enable row level security;
 -- 작업물 구분: 개인 작업물 / 팀 작업물(참여자와 역할 기록)
 alter table works add column if not exists section text not null default 'personal';   -- 'personal' | 'team'
 alter table works add column if not exists contributors text not null default '[]';    -- [{"name": "...", "role": "..."}]
+
+-- 날짜별 진행 현황: 팀원마다 하루 한 행
+create table if not exists progress_logs (
+  member_id   text not null,
+  date        text not null,                  -- YYYY-MM-DD
+  label       text not null default '',       -- 굵게 표시할 구분 (예: 멘토링 이후 재분석 시작)
+  text        text not null default '',       -- 핵심 작업
+  updated_at  timestamptz not null default now(),
+  primary key (member_id, date)
+);
+alter table progress_logs enable row level security;

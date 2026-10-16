@@ -159,6 +159,7 @@ const SNAPSHOTS = {
   datasets: () => ['datasets:state', store.listDatasets()],
   meetings: () => ['meetings:state', store.getMeetings()],
   works: () => ['works:state', store.getWorks()],
+  progress: () => ['progress:state', store.getProgress()],
 };
 
 io.on('connection', (socket) => {
@@ -197,6 +198,8 @@ io.on('connection', (socket) => {
   );
 
   handle('kanban:action', (action) => store.applyKanbanAction(action), () => io.emit(...SNAPSHOTS.kanban()));
+
+  handle('progress:action', (action, member) => store.applyProgressAction(action, member), () => io.emit(...SNAPSHOTS.progress()));
 
   handle(
     'work:action',
