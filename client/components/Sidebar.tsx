@@ -8,6 +8,7 @@ import { useSynced } from '../lib/socket';
 import { doneColumnId, useKanban } from '../lib/useKanban';
 import type { CalendarEvent } from '../lib/types';
 import { daysUntil, todayStr } from '../lib/date';
+import { useChatUnread } from '../lib/useChatUnread';
 import {
   Award,
   Bell,
@@ -112,12 +113,25 @@ export default function Sidebar() {
     return list.sort((a, b) => Number(b.urgent) - Number(a.urgent));
   }, [kanban, events]);
 
+  // 안 읽은 팀 채팅
+  const { unread: unreadChat } = useChatUnread(me?.id, pathname.startsWith('/chat'));
+  const lastChat = unreadChat[unreadChat.length - 1];
+  const chatPreview = lastChat ? `${lastChat.sender}: ${lastChat.text || (lastChat.file ? `파일 ${lastChat.file.name}` : '')}` : '';
+  const hasAlert = notifications.length > 0 || unreadChat.length > 0;
+
+  // 브라우저 탭 제목에도 안 읽은 개수 표시
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\) /, '');
+    document.title = unreadChat.length ? `(${unreadChat.length > 99 ? '99+' : unreadChat.length}) ${base}` : base;
+  }, [unreadChat.length, pathname]);
+
   return (
     <>
       {/* 모바일 상단 바 */}
       <div className="md:hidden fixed top-0 inset-x-0 z-40 h-12 flex items-center justify-between px-3 bg-[#F7F7F5]/95 dark:bg-slate-900/95 backdrop-blur border-b border-gray-200 dark:border-slate-800">
-        <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg text-gray-700 dark:text-gray-200" aria-label="메뉴 열기">
+        <button onClick={() => setMobileOpen(true)} className="relative p-1.5 rounded-lg text-gray-700 dark:text-gray-200" aria-label="메뉴 열기">
           <Menu size={20} />
+          {hasAlert && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#F7F7F5] dark:ring-slate-900" />}
         </button>
         <Logo size="sm" />
         <span className="w-8" />
@@ -130,9 +144,9 @@ export default function Sidebar() {
         }`}
       >
         {/* 헤더 및 스위치 영역 */}
-        <div className="flex items-center justify-between px-2">
+        <div className="relative flex items-center justify-between px-2">
           <Logo />
-          <div className="flex items-center gap-0.5 relative">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="p-1.5 rounded-lg hover:bg-gray-200/60 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 relative"
@@ -140,7 +154,7 @@ export default function Sidebar() {
               aria-label="알림 센터"
             >
               <Bell size={17} strokeWidth={1.75} />
-              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#F7F7F5] dark:ring-slate-900" />}
+              {hasAlert && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#F7F7F5] dark:ring-slate-900" />}
             </button>
 
             <button
@@ -153,16 +167,29 @@ export default function Sidebar() {
             </button>
 
             {showNotifications && (
-              <div className="absolute top-9 right-0 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 p-3 space-y-2 text-xs">
+              <div className="absolute top-10 inset-x-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 p-3 space-y-2 text-xs">
                 <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-slate-700">
                   <span className="font-bold text-gray-800 dark:text-gray-200">알림</span>
                   <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600" aria-label="닫기">
                     <X size={14} />
                   </button>
                 </div>
-                <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <p className="text-center text-gray-400 py-4">다가오는 마감이 없습니다.</p>
+                <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                  {unreadChat.length > 0 && (
+                    <Link
+                      href="/chat"
+                      onClick={() => setShowNotifications(false)}
+                      className="flex gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40"
+                    >
+                      <MessageSquare size={14} className="shrink-0 mt-0.5 text-blue-500" />
+                      <span className="min-w-0 flex-1 space-y-0.5">
+                        <span className="block font-semibold text-blue-700 dark:text-blue-300">새 채팅 {unreadChat.length}개</span>
+                        <span className="block text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 break-words">{chatPreview}</span>
+                      </span>
+                    </Link>
+                  )}
+                  {notifications.length === 0 && unreadChat.length === 0 ? (
+                    <p className="text-center text-gray-400 py-4">새 알림이 없습니다.</p>
                   ) : (
                     notifications.map((n) => (
                       <Link
@@ -172,9 +199,9 @@ export default function Sidebar() {
                         className={`flex gap-2 p-2 rounded-lg ${n.urgent ? 'bg-red-50 dark:bg-red-950/40' : 'bg-gray-50 dark:bg-slate-700/60'}`}
                       >
                         <CalendarClock size={14} className={`shrink-0 mt-0.5 ${n.urgent ? 'text-red-500' : 'text-gray-400'}`} />
-                        <span className="min-w-0 space-y-0.5">
+                        <span className="min-w-0 flex-1 space-y-0.5">
                           <span className={`block font-semibold ${n.urgent ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>{n.title}</span>
-                          <span className="block text-[11px] text-gray-500 dark:text-gray-400">{n.text}</span>
+                          <span className="block text-[11px] text-gray-500 dark:text-gray-400 break-words">{n.text}</span>
                         </span>
                       </Link>
                     ))
@@ -202,6 +229,11 @@ export default function Sidebar() {
               >
                 <Icon size={17} strokeWidth={isActive ? 2 : 1.75} className={isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'} />
                 <span>{item.name}</span>
+                {item.href === '/chat' && unreadChat.length > 0 && (
+                  <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadChat.length > 99 ? '99+' : unreadChat.length}
+                  </span>
+                )}
               </Link>
             );
           })}

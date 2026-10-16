@@ -60,6 +60,16 @@ async function init() {
   state.meetings = mt.rows.map(meetingFromRow);
   state.chat = ch.rows.reverse().map((r) => ({ id: r.id, senderId: r.sender_id, text: r.text, fileId: r.file_id, createdAt: r.created_at.toISOString() }));
 
+  // 예전 기본 컬럼 이름의 이모지 제거 (사용자가 이름을 바꾸지 않은 경우에만)
+  const LEGACY_LABELS = { todo: '📋 할 일', in_progress: '⚡ 진행 중', done: '✅ 완료' };
+  for (const col of state.columns) {
+    const fresh = defaultColumns().find((d) => d.id === col.id);
+    if (fresh && LEGACY_LABELS[col.id] === col.label) {
+      await q('update kanban_columns set label = $2 where id = $1 and label = $3', [col.id, fresh.label, col.label]);
+      col.label = fresh.label;
+    }
+  }
+
   // 처음 실행이면 기본 컬럼 생성
   if (state.columns.length === 0) {
     for (const col of defaultColumns()) await addColumnRow(col);
@@ -68,9 +78,9 @@ async function init() {
 
 function defaultColumns() {
   return [
-    { id: 'todo', label: '📋 할 일', color: 'amber' },
-    { id: 'in_progress', label: '⚡ 진행 중', color: 'blue' },
-    { id: 'done', label: '✅ 완료', color: 'emerald' },
+    { id: 'todo', label: '할 일', color: 'amber' },
+    { id: 'in_progress', label: '진행 중', color: 'blue' },
+    { id: 'done', label: '완료', color: 'emerald' },
   ];
 }
 
