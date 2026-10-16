@@ -1,5 +1,6 @@
 'use client';
 
+import { Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { api } from '../lib/auth';
 import { useSynced } from '../lib/socket';
@@ -43,7 +44,7 @@ export default function DatasetUploader() {
     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-4">
       <div className="flex flex-wrap gap-3 items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
         <div>
-          <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base">📊 연구/프로젝트 데이터셋</h3>
+          <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base">데이터셋</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {datasets ? `${datasets.length}개 · 총 ${formatSize(totalSize)}` : '불러오는 중...'}
           </p>
@@ -62,9 +63,9 @@ export default function DatasetUploader() {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={!!uploading}
-          className="bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition disabled:opacity-50 cursor-pointer"
         >
-          {uploading ? '업로드 중...' : '💾 데이터셋 추가 (최대 1GB)'}
+          {uploading ? '업로드 중...' : <><Upload size={14} /> 데이터셋 추가 (최대 1GB)</>}
         </button>
       </div>
 
@@ -88,7 +89,7 @@ export default function DatasetUploader() {
         {uploading ? (
           <div className="space-y-1.5 text-left">
             <div className="flex justify-between text-gray-600 dark:text-gray-300">
-              <span className="truncate pr-2">⬆️ {uploading.name}</span>
+              <span className="truncate pr-2 inline-flex items-center gap-1"><Upload size={12} className="shrink-0" /> {uploading.name}</span>
               <span>{uploading.percent}%</span>
             </div>
             <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
@@ -126,8 +127,8 @@ export default function DatasetUploader() {
                 >
                   다운로드
                 </button>
-                <button onClick={() => handleDelete(data)} className="text-gray-400 hover:text-red-500 px-1.5 cursor-pointer" title="삭제">
-                  🗑
+                <button onClick={() => handleDelete(data)} className="text-gray-400 hover:text-red-500 px-1.5 cursor-pointer" title="삭제" aria-label="삭제">
+                  <Trash2 size={15} />
                 </button>
               </div>
             </div>

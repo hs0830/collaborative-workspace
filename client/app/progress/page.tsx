@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowUpDown, Check, ChevronRight, Copy, Download, Users } from 'lucide-react';
 import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCurrentUser, type Member } from '../../lib/auth';
@@ -200,7 +201,7 @@ function ProgressView() {
     <div className="space-y-5">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4 flex flex-wrap gap-3 justify-between items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">📈 진행 현황</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">진행 현황</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             팀원별 날짜 · 핵심 작업 기록이에요. 앞으로의 날짜에 적으면 예정으로 표시돼요.
           </p>
@@ -209,17 +210,17 @@ function ProgressView() {
           <button
             onClick={copyTable}
             disabled={!exportable}
-            className="bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-100 text-xs font-medium px-3 py-2 rounded-lg transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-100 text-xs font-medium px-3 py-2 rounded-lg transition disabled:opacity-50"
             title="Word·한글에 붙여 넣으면 표로 들어가요"
           >
-            {copied ? '✓ 복사됨' : '📋 표 복사'}
+            {copied ? <><Check size={14} /> 복사됨</> : <><Copy size={14} /> 표 복사</>}
           </button>
           <button
             onClick={downloadMarkdown}
             disabled={!exportable}
-            className="bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-100 text-xs font-medium px-3 py-2 rounded-lg transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-100 text-xs font-medium px-3 py-2 rounded-lg transition disabled:opacity-50"
           >
-            📥 Markdown
+            <Download size={14} /> Markdown
           </button>
           <button
             onClick={() => setEditing(`${target.id}|new`)}
@@ -272,7 +273,8 @@ function ProgressView() {
               : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-gray-400'
           }`}
         >
-          👥 전체
+          <Users size={13} className="inline -mt-0.5 mr-1" />
+          전체
         </button>
       </div>
 
@@ -288,8 +290,8 @@ function ProgressView() {
             {label}
           </button>
         ))}
-        <button onClick={() => setNewestFirst((v) => !v)} className="ml-auto text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
-          {newestFirst ? '↑ 최신 날짜부터' : '↓ 오래된 날짜부터'}
+        <button onClick={() => setNewestFirst((v) => !v)} className="ml-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+          <ArrowUpDown size={13} /> {newestFirst ? '최신 날짜부터' : '오래된 날짜부터'}
         </button>
       </div>
 
@@ -369,8 +371,8 @@ function PersonTable({
         <div className={`bg-white dark:bg-slate-900 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl text-center space-y-2 ${compact ? 'py-5' : 'py-12'}`}>
           <p className="text-xs text-gray-400">{person.name}님의 기록이 아직 없어요.</p>
           {!compact && (
-            <button onClick={() => setEditing(`${person.id}|new`)} className="text-xs font-semibold text-blue-600 hover:underline">
-              기록 추가하기 →
+            <button onClick={() => setEditing(`${person.id}|new`)} className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
+              기록 추가하기 <ChevronRight size={14} />
             </button>
           )}
         </div>

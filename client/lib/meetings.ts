@@ -20,12 +20,12 @@ export function timeAgo(iso: string) {
 
 /** 새 회의록에 미리 채워 넣는 기본 양식 */
 export const MEETING_TEMPLATE = `
-<h2>📌 안건</h2>
+<h2>안건</h2>
 <ul><li><p></p></li></ul>
-<h2>💬 논의 내용</h2>
+<h2>논의 내용</h2>
 <p></p>
-<h2>✅ 결정 사항</h2>
+<h2>결정 사항</h2>
 <ul><li><p></p></li></ul>
-<h2>📋 할 일</h2>
+<h2>할 일</h2>
 <ul><li><p></p></li></ul>
 `;

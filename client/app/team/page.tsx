@@ -1,5 +1,6 @@
 'use client';
 
+import { Award, ChevronRight, Mail, X } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useCurrentUser, type Member } from '../../lib/auth';
@@ -37,7 +38,7 @@ export default function TeamPage() {
     <div className="space-y-6">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4 flex flex-wrap gap-3 justify-between items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">👥 프로젝트 팀원 관리</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">팀원 관리</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             팀원 카드를 클릭하면 역할과 담당 업무를 볼 수 있어요. 담당 업무는 칸반 카드의 담당자 이름으로 자동 연결됩니다.
           </p>
@@ -77,7 +78,8 @@ export default function TeamPage() {
                     </div>
                   </div>
                   <div className="text-[11px] text-gray-400 border-t border-gray-100 dark:border-slate-800 pt-2 truncate">
-                    ✉️ {member.email || '이메일 미등록'}
+                    <Mail size={12} className="inline -mt-0.5 mr-1" />
+                    {member.email || '이메일 미등록'}
                   </div>
                 </div>
 
@@ -150,7 +152,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-lg cursor-pointer px-2" aria-label="닫기">
-          ✕
+          <X size={18} />
         </button>
         {children}
       </div>
@@ -213,16 +215,16 @@ function MemberModal({
           <div className="min-w-0">
             <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">{member.name}</h3>
             <p className="text-xs font-semibold text-blue-600 mt-0.5">{member.role || '역할 미지정'}</p>
-            <p className="text-[11px] text-gray-400 mt-1">📧 {member.email || '이메일 미등록'}</p>
+            <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Mail size={12} /> {member.email || '이메일 미등록'}</p>
           </div>
         )}
       </div>
 
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">📌 담당 업무 ({tasks.length})</h4>
-          <Link href={isMe ? '/work' : `/work?member=${member.id}`} className="text-[11px] text-blue-600 hover:underline">
-            🏅 작업 기록 보기 →
+          <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">담당 업무 ({tasks.length})</h4>
+          <Link href={isMe ? '/work' : `/work?member=${member.id}`} className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
+            <Award size={12} /> 작업 기록 보기 <ChevronRight size={12} />
           </Link>
         </div>
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -242,7 +244,7 @@ function MemberModal({
                   <div className="space-y-1 min-w-0">
                     <p className={`font-semibold leading-snug ${done ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-100'}`}>{task.title}</p>
                     <p className={`text-[10px] ${!done && d !== null && d < 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                      📅 {task.dueDate ? `마감 ${task.dueDate}${!done && d !== null && d < 0 ? ' (지남)' : ''}` : '마감일 없음'}
+                      {task.dueDate ? `마감 ${task.dueDate}${!done && d !== null && d < 0 ? ' (지남)' : ''}` : '마감일 없음'}
                     </p>
                   </div>
                   <span className="text-[10px] px-2.5 py-1 rounded-full font-bold border bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 shrink-0">
@@ -301,7 +303,7 @@ function AddMemberModal({ onClose, onAdd }: { onClose: () => void; onAdd: (d: { 
         className="space-y-4"
       >
         <div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">➕ 새 팀원 추가</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">새 팀원 추가</h3>
           <p className="text-[11px] text-gray-400 mt-1">미리 등록해 두면, 그 팀원이 같은 이름으로 로그인할 때 이 프로필로 연결됩니다.</p>
         </div>
 

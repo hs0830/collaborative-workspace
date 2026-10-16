@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { Paperclip, User as UserIcon, Users } from 'lucide-react';
 import type { Member } from '../lib/auth';
 import { formatSize, LIMITS, uploadFile } from '../lib/files';
 import {
@@ -129,7 +130,7 @@ export default function WorkForm({
         className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         <div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{initial ? '✏️ 작업물 수정' : '📤 작업물 올리기'}</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{initial ? '작업물 수정' : '작업물 올리기'}</h3>
           <p className="text-[11px] text-gray-400 mt-1">무엇을, 왜 했는지 적어 두면 나중에 포트폴리오나 발표에서 역할을 설명하기 쉬워요.</p>
         </div>
 
@@ -137,10 +138,10 @@ export default function WorkForm({
         <div className="grid grid-cols-2 gap-2 text-xs">
           {(
             [
-              ['personal', '🙋 개인 작업물', '내가 맡아서 한 작업'],
-              ['team', '🤝 팀 작업물', '여러 명이 함께 만든 결과물'],
+              ['personal', '개인 작업물', '내가 맡아서 한 작업', UserIcon],
+              ['team', '팀 작업물', '여러 명이 함께 만든 결과물', Users],
             ] as const
-          ).map(([value, label, desc]) => (
+          ).map(([value, label, desc, Icon]) => (
             <button
               type="button"
               key={value}
@@ -151,7 +152,9 @@ export default function WorkForm({
                   : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
               }`}
             >
-              <p className="font-bold text-gray-800 dark:text-gray-100">{label}</p>
+              <p className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+                <Icon size={14} className={section === value ? 'text-blue-600' : 'text-gray-400'} /> {label}
+              </p>
               <p className="text-[11px] text-gray-400 mt-0.5">{desc}</p>
             </button>
           ))}
@@ -165,11 +168,13 @@ export default function WorkForm({
             <input type="file" ref={fileRef} className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? undefined)} />
             {file ? (
               <p className="text-gray-700 dark:text-gray-200">
-                📎 {file.name} <span className="text-gray-400">({formatSize(file.size)})</span>
+                <Paperclip size={12} className="inline -mt-0.5 mr-1" />
+                {file.name} <span className="text-gray-400">({formatSize(file.size)})</span>
               </p>
             ) : existing ? (
               <p className="text-gray-700 dark:text-gray-200">
-                📎 {existing.name} <span className="text-gray-400">({formatSize(existing.size)})</span>
+                <Paperclip size={12} className="inline -mt-0.5 mr-1" />
+                {existing.name} <span className="text-gray-400">({formatSize(existing.size)})</span>
               </p>
             ) : (
               <p className="text-gray-400">이 창에 파일을 끌어다 놓거나 선택하세요 (PPT, PDF, Word, 코드, 이미지 등 · 최대 1GB)</p>

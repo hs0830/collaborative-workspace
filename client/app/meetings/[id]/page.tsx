@@ -1,5 +1,6 @@
 'use client';
 
+import { Check, ChevronLeft, ChevronRight, SquareKanban } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -39,8 +40,8 @@ export default function MeetingDetailPage() {
     return (
       <div className="py-20 text-center space-y-3">
         <p className="text-sm text-gray-500">회의록을 찾을 수 없어요. 삭제되었을 수 있어요.</p>
-        <Link href="/meetings" className="text-xs font-semibold text-blue-600 hover:underline">
-          ← 회의록 목록으로
+        <Link href="/meetings" className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
+          <ChevronLeft size={14} /> 회의록 목록으로
         </Link>
       </div>
     );
@@ -50,8 +51,8 @@ export default function MeetingDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/meetings" className="no-print text-xs text-gray-500 hover:text-blue-600">
-        ← 회의록 목록
+      <Link href="/meetings" className="no-print inline-flex items-center gap-0.5 text-xs text-gray-500 hover:text-blue-600">
+        <ChevronLeft size={14} /> 회의록 목록
       </Link>
 
       {/* 회의 정보 (인쇄 시에도 출력) */}
@@ -104,7 +105,7 @@ export default function MeetingDetailPage() {
         <div className="xl:col-span-3">
           <CollaborativeEditor
             room={`meeting-${meeting.id}`}
-            label="🗒️ 회의 내용"
+            label="회의 내용"
             exportName={`${meeting.date} ${meeting.title}`}
             template={isNew ? MEETING_TEMPLATE : undefined}
             onTemplateApplied={onTemplateApplied}
@@ -157,7 +158,7 @@ function TodoToKanban({ meeting, members }: { meeting: Meeting; members: Member[
   return (
     <aside className="no-print bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
       <div>
-        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">📋 할 일 → 칸반</h3>
+        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5"><SquareKanban size={15} /> 할 일을 칸반으로</h3>
         <p className="text-[11px] text-gray-400 mt-0.5">회의에서 정한 할 일을 바로 칸반 카드로 만들어요.</p>
       </div>
 
@@ -191,14 +192,14 @@ function TodoToKanban({ meeting, members }: { meeting: Meeting; members: Member[
 
       {added.length > 0 && (
         <div className="pt-2 border-t border-gray-100 dark:border-slate-800 space-y-1">
-          <p className="text-[11px] font-semibold text-emerald-600">✓ 추가됨 ({added.length})</p>
+          <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1"><Check size={12} /> 추가됨 ({added.length})</p>
           {added.map((t, i) => (
             <p key={i} className="text-[11px] text-gray-600 dark:text-gray-300 truncate">
               · {t}
             </p>
           ))}
-          <Link href="/kanban" className="inline-block text-[11px] text-blue-600 hover:underline pt-1">
-            칸반에서 보기 →
+          <Link href="/kanban" className="inline-flex items-center text-[11px] text-blue-600 hover:underline pt-1">
+            칸반에서 보기 <ChevronRight size={12} />
           </Link>
         </div>
       )}

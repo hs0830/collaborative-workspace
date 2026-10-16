@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { useState } from 'react';
 import type { Member } from '../lib/auth';
 
@@ -50,7 +51,7 @@ export default function MeetingForm({
         }}
         className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl"
       >
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">🗒️ {title}</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
 
         <div className="space-y-3 text-xs">
           <label className="block space-y-1">
@@ -88,7 +89,7 @@ export default function MeetingForm({
                         : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-blue-400'
                     }`}
                   >
-                    {on ? '✓ ' : ''}
+                    {on && <Check size={11} className="inline -mt-0.5 mr-0.5" />}
                     {n}
                   </button>
                 );

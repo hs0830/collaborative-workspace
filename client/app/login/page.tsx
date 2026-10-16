@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { login } from '../../lib/auth';
+import Logo from '../../components/Logo';
 
 export default function LoginPage() {
   const [code, setCode] = useState('');
@@ -25,8 +26,8 @@ export default function LoginPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-sm p-7 space-y-5"
       >
-        <div className="space-y-1">
-          <h1 className="text-xl font-extrabold text-gray-900 dark:text-white">🚀 팀 워크스페이스</h1>
+        <div className="space-y-3">
+          <Logo />
           <p className="text-xs text-gray-500 dark:text-gray-400">초대 코드와 이름을 입력하세요.</p>
         </div>
 

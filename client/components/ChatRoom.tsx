@@ -1,5 +1,6 @@
 'use client';
 
+import { Paperclip } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { emitAction, getSocket, useSocketConnected, useSynced } from '../lib/socket';
 import { useCurrentUser } from '../lib/auth';
@@ -72,7 +73,7 @@ export default function ChatRoom() {
     <div className="flex flex-col h-[calc(100vh-14rem)] min-h-[420px] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/40 flex justify-between items-center">
         <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm flex items-center gap-2">
-          💬 팀 실시간 채팅
+          팀 채팅
           <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`} title={connected ? '연결됨' : '연결 끊김'} />
         </h3>
         <span className="text-xs text-gray-400">최대 20MB 첨부 가능</span>
@@ -122,8 +123,9 @@ export default function ChatRoom() {
             disabled={!connected || progress !== null}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition disabled:opacity-40"
             title="파일 첨부"
+            aria-label="파일 첨부"
           >
-            📎
+            <Paperclip size={18} />
           </button>
           <input
             type="text"
@@ -170,7 +172,7 @@ function Attachment({ file }: { file: StoredFile }) {
       onClick={() => downloadFile(file.id).catch((e) => alert(e.message))}
       className="flex items-center gap-1 text-xs underline underline-offset-2 opacity-90 hover:opacity-100 cursor-pointer text-left"
     >
-      📎 {file.name} ({formatSize(file.size)})
+      <Paperclip size={12} className="shrink-0" /> {file.name} ({formatSize(file.size)})
     </button>
   );
 }

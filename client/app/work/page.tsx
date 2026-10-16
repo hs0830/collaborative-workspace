@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronRight, Link2, Paperclip, SquareKanban } from 'lucide-react';
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -115,8 +116,8 @@ function WorkRecords() {
     return (
       <div className="py-20 text-center space-y-3">
         <p className="text-sm text-gray-500">팀원을 찾을 수 없어요.</p>
-        <Link href="/work" className="text-xs font-semibold text-blue-600 hover:underline">
-          내 작업 기록으로 →
+        <Link href="/work" className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
+          내 작업 기록으로 <ChevronRight size={14} />
         </Link>
       </div>
     );
@@ -130,7 +131,7 @@ function WorkRecords() {
             {person.name.slice(0, 2)}
           </span>
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">🏅 {isMe ? '내' : `${person.name}님의`} 작업 기록</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">{isMe ? '내' : `${person.name}님의`} 작업 기록</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               팀 작업물에서 맡은 역할과 개인 작업물, 완료한 카드·참석한 회의·올린 데이터셋이 모여요.
             </p>
@@ -188,8 +189,8 @@ function WorkRecords() {
         <div className="bg-white dark:bg-slate-900 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl py-14 text-center space-y-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">아직 기록이 없어요.</p>
           {isMe && filter !== 'task' && filter !== 'meeting' && filter !== 'dataset' && (
-            <button onClick={() => setEditing('new')} className="text-xs font-semibold text-blue-600 hover:underline">
-              첫 작업물 올리기 →
+            <button onClick={() => setEditing('new')} className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
+              첫 작업물 올리기 <ChevronRight size={14} />
             </button>
           )}
         </div>
@@ -292,7 +293,7 @@ function EntryCard({
                     </span>
                     <span className="break-words min-w-0">
                       {c.role || <span className="text-gray-300 dark:text-slate-600 font-normal">역할 미입력</span>}
-                      {focus && <span className="ml-1.5 text-[10px] text-indigo-600 dark:text-indigo-300">← {personName === me.name ? '내' : `${personName}님`} 역할</span>}
+                      {focus && <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">{personName === me.name ? '내' : `${personName}님`} 역할</span>}
                     </span>
                   </li>
                 );
@@ -302,7 +303,8 @@ function EntryCard({
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] pt-0.5">
             {w.file && (
               <button onClick={() => openFile(w.file!).catch((e) => alert(e.message))} className="text-blue-600 hover:underline text-left">
-                📎 {w.file.name} ({formatSize(w.file.size)}){/^image\/|^application\/pdf$/.test(w.file.contentType) ? ' · 보기' : ''}
+                <Paperclip size={12} className="inline -mt-0.5 mr-1" />
+                {w.file.name} ({formatSize(w.file.size)}){/^image\/|^application\/pdf$/.test(w.file.contentType) ? ' · 보기' : ''}
               </button>
             )}
             {w.file && /^image\/|^application\/pdf$/.test(w.file.contentType) && (
@@ -312,10 +314,15 @@ function EntryCard({
             )}
             {w.linkUrl && (
               <a href={w.linkUrl} target="_blank" rel="noreferrer noopener" className="text-blue-600 hover:underline break-all">
-                🔗 {w.linkUrl.replace(/^https?:\/\//, '').slice(0, 50)}
+                <Link2 size={12} className="inline -mt-0.5 mr-1" />
+                {w.linkUrl.replace(/^https?:\/\//, '').slice(0, 50)}
               </a>
             )}
-            {linked && <span className="text-gray-500">📋 {linked.title}</span>}
+            {linked && (
+              <span className="text-gray-500 inline-flex items-center gap-1">
+                <SquareKanban size={12} /> {linked.title}
+              </span>
+            )}
           </div>
         </div>
         {(canEdit || canDelete) && (

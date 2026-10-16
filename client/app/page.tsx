@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import type { Member } from '../lib/auth';
 import { useSynced } from '../lib/socket';
@@ -52,7 +53,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4">
-        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">📊 프로젝트 현황 대시보드</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">대시보드</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">칸반 보드와 캘린더의 실제 데이터로 계산됩니다.</p>
       </header>
 
@@ -69,14 +70,14 @@ export default function DashboardPage() {
             <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
-        <Stat card={card} color="text-amber-600" label="📋 대기 중 카드" value={todoTasks} sub="우선순위 지정 필요" />
-        <Stat card={card} color="text-blue-600" label="⚡ 진행 중 카드" value={inProgressTasks} sub="실시간 진행 작업" />
-        <Stat card={card} color="text-emerald-600" label="✅ 완료된 카드" value={completedTasks} sub="목표 달성" />
+        <Stat card={card} color="text-amber-600" label="대기 중" value={todoTasks} sub="우선순위 지정 필요" />
+        <Stat card={card} color="text-blue-600" label="진행 중" value={inProgressTasks} sub="실시간 진행 작업" />
+        <Stat card={card} color="text-emerald-600" label="완료" value={completedTasks} sub="목표 달성" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className={`${card} p-6 space-y-4`}>
-          <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">👥 팀원별 담당 과제</h3>
+          <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">팀원별 담당 과제</h3>
           {distribution.length === 0 ? (
             <p className="text-xs text-gray-400">칸반 카드에 담당자를 지정하면 표시됩니다.</p>
           ) : (
@@ -104,9 +105,9 @@ export default function DashboardPage() {
 
         <div className={`${card} p-6 space-y-4`}>
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">⏰ 다가오는 마감 (2주)</h3>
-            <Link href="/calendar" className="text-[11px] text-blue-600 hover:underline">
-              캘린더 →
+            <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">다가오는 마감 (2주)</h3>
+            <Link href="/calendar" className="inline-flex items-center text-[11px] text-blue-600 hover:underline">
+              캘린더 <ChevronRight size={13} />
             </Link>
           </div>
           {upcoming.length === 0 ? (

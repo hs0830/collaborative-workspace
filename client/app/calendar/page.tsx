@@ -76,7 +76,7 @@ export default function CalendarPage() {
   return (
     <div className="space-y-6">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4">
-        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">📅 팀 프로젝트 캘린더</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">팀 캘린더</h1>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           날짜를 클릭해 일정을 등록하세요. 칸반 카드에 마감일을 넣으면 여기에도 자동으로 표시됩니다.
         </p>
@@ -176,7 +176,7 @@ export default function CalendarPage() {
         {/* 선택한 날짜 */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4 h-fit">
           <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm border-b border-gray-100 dark:border-slate-800 pb-2">
-            📌 {selectedDate} {selectedDate === today && <span className="text-blue-500">(오늘)</span>}
+            {selectedDate} {selectedDate === today && <span className="text-blue-500">(오늘)</span>}
           </h3>
 
           <form onSubmit={handleAddEvent} className="space-y-2">
@@ -207,16 +207,15 @@ export default function CalendarPage() {
                   <div className="min-w-0">
                     {it.kind === 'meeting' ? (
                       <Link href={`/meetings/${it.id}`} className="font-semibold text-purple-600 dark:text-purple-400 hover:underline">
-                        🗒️ {it.title}
+                        {it.title}
                       </Link>
                     ) : (
                       <p className={`font-semibold ${it.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                        {it.kind === 'task' ? '📋 ' : ''}
                         {it.title}
                       </p>
                     )}
                     <p className="text-[10px] text-gray-400">
-                      👤 {it.assignee}
+                      {it.assignee}
                       {it.kind === 'task' && ' · 칸반 카드 마감'}
                       {it.kind === 'meeting' && ' · 회의록'}
                     </p>

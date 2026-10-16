@@ -1,5 +1,6 @@
 'use client';
 
+import { Download, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
@@ -169,7 +170,7 @@ function EditorShell({
     <div className="print-area bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xs p-6 space-y-4">
       <div className="no-print flex flex-wrap gap-3 justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{options.label ?? '📄 실시간 협업 문서'}</span>
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{options.label ?? '공유 문서'}</span>
           <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
             <span className={`w-2 h-2 rounded-full ${statusLabel.dot}`} />
             {statusLabel.text}
@@ -197,15 +198,15 @@ function EditorShell({
           <button
             onClick={downloadMarkdown}
             disabled={!editor}
-            className="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 text-xs font-semibold rounded-lg transition cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 text-xs font-semibold rounded-lg transition cursor-pointer disabled:opacity-50"
           >
-            📥 Markdown 다운로드
+            <Download size={13} /> Markdown
           </button>
           <button
             onClick={() => window.print()}
-            className="px-2.5 py-1 bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-xs font-semibold rounded-lg transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-900 dark:bg-white dark:text-gray-900 text-white text-xs font-semibold rounded-lg transition cursor-pointer"
           >
-            🖨️ PDF/인쇄 출력
+            <Printer size={13} /> PDF/인쇄
           </button>
         </div>
       </div>

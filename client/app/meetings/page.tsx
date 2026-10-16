@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -55,7 +56,7 @@ export default function MeetingsPage() {
     <div className="space-y-6">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4 flex flex-wrap gap-3 justify-between items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">🗒️ 회의록</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">회의록</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             회의록을 팀원들과 함께 실시간으로 작성하세요. 입력한 내용은 자동으로 저장됩니다.
           </p>
@@ -101,8 +102,8 @@ export default function MeetingsPage() {
             {meetings.length === 0 ? '아직 회의록이 없어요.' : '검색 결과가 없어요.'}
           </p>
           {meetings.length === 0 && (
-            <button onClick={() => setCreating(true)} className="text-xs font-semibold text-blue-600 hover:underline">
-              첫 회의록 작성하기 →
+            <button onClick={() => setCreating(true)} className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
+              첫 회의록 작성하기 <ChevronRight size={14} />
             </button>
           )}
         </div>

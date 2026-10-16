@@ -1,5 +1,6 @@
 'use client';
 
+import { Calendar, CircleCheck, Tag as TagIcon, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   DndContext,
@@ -137,7 +138,7 @@ export default function KanbanBoard() {
 
       {/* 태그 필터 */}
       <div className="flex flex-wrap gap-1.5 items-center">
-        <span className="text-xs font-bold text-gray-500 mr-1">🏷️ 태그 필터:</span>
+        <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1"><TagIcon size={13} /> 태그</span>
         {(['전체', ...TAGS] as const).map((t) => (
           <button
             key={t}
@@ -214,8 +215,8 @@ function Column({
           <span className="text-[10px] font-bold bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-300 px-2 py-0.5 rounded-full border border-gray-200 dark:border-slate-700">
             {tasks.length}
           </span>
-          <button onClick={onDeleteColumn} className="text-gray-400 hover:text-red-500 text-xs px-1 cursor-pointer" title="상태 컬럼 삭제">
-            ✕
+          <button onClick={onDeleteColumn} className="text-gray-400 hover:text-red-500 text-xs px-1 cursor-pointer" title="상태 컬럼 삭제" aria-label="상태 컬럼 삭제">
+            <X size={13} />
           </button>
         </div>
       </div>
@@ -344,13 +345,13 @@ function CardBody({ task, actions, dragging }: { task: KanbanTask; actions?: Rea
       <p className="font-medium text-gray-800 dark:text-gray-100 leading-snug">{task.title}</p>
       <div className="flex flex-wrap gap-1.5 items-center text-[10px]">
         <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold">{task.tag}</span>
-        <span className="text-gray-400">👤 {task.assignee}</span>
+        <span className="text-gray-400 inline-flex items-center gap-0.5"><User size={11} /> {task.assignee}</span>
         {task.completedAt ? (
-          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-            ✓ {new Date(task.completedAt).getMonth() + 1}/{new Date(task.completedAt).getDate()} 완료
+          <span className="text-emerald-600 dark:text-emerald-400 font-semibold inline-flex items-center gap-0.5">
+            <CircleCheck size={11} /> {new Date(task.completedAt).getMonth() + 1}/{new Date(task.completedAt).getDate()} 완료
           </span>
         ) : (
-          task.dueDate && <span className={overdue ? 'text-red-500 font-semibold' : 'text-gray-400'}>📅 {task.dueDate.slice(5)}</span>
+          task.dueDate && <span className={`inline-flex items-center gap-0.5 ${overdue ? 'text-red-500 font-semibold' : 'text-gray-400'}`}><Calendar size={11} /> {task.dueDate.slice(5)}</span>
         )}
       </div>
       {actions && (
