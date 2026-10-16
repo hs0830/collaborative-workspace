@@ -90,7 +90,7 @@ export default function WorkForm({
     setSaving(true);
     try {
       const contributors: Contributor[] =
-        section === 'team' ? names.filter((n) => n in roles).map((n) => ({ name: n, role: roles[n].trim() })) : [];
+        names.filter((n) => n in roles).map((n) => ({ name: n, role: roles[n].trim() })); // 개인으로 바꿔도 역할은 보관
       const data: WorkInput = {
         section,
         title: title.trim(),

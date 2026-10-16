@@ -549,7 +549,8 @@ async function applyWorkAction(action, member) {
         title,
         description: str(p.description, 2000),
         category: WORK_CATEGORIES.includes(p.category) ? p.category : '기타',
-        contributors: section === 'team' ? withOwner(cleanContributors(p.contributors), member.name) : [],
+        // 개인 작업물이어도 참여자 정보는 보관 → 나중에 팀 작업물로 바꾸면 그대로 살아남
+        contributors: section === 'team' ? withOwner(cleanContributors(p.contributors), member.name) : cleanContributors(p.contributors),
         fileId: usableWorkFile(p.fileId, member),
         linkUrl: cleanUrl(p.linkUrl),
         taskId: state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null,
@@ -574,10 +575,11 @@ async function applyWorkAction(action, member) {
         title: p.title !== undefined ? str(p.title, 100) || w.title : w.title,
         description: p.description !== undefined ? str(p.description, 2000) : w.description,
         category: p.category !== undefined && WORK_CATEGORIES.includes(p.category) ? p.category : w.category,
-        contributors:
-          section === 'team'
-            ? withOwner(p.contributors !== undefined ? cleanContributors(p.contributors) : w.contributors, ownerName)
-            : [],
+        // 팀 ↔ 개인을 바꿔도 참여자·역할은 지우지 않음 (개인일 때는 화면에만 안 보임)
+        contributors: (() => {
+          const list = p.contributors !== undefined ? cleanContributors(p.contributors) : w.contributors;
+          return section === 'team' ? withOwner(list, ownerName) : list;
+        })(),
         linkUrl: p.linkUrl !== undefined ? cleanUrl(p.linkUrl) : w.linkUrl,
         taskId: p.taskId !== undefined ? (state.tasks.some((t) => t.id === p.taskId) ? p.taskId : null) : w.taskId,
         // 새 파일로 바꿀 때만 fileId 를 보냄. null 이면 파일 제거

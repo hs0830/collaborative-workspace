@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Link2, Paperclip, SquareKanban } from 'lucide-react';
+import { ArrowLeftRight, ChevronRight, Link2, Paperclip, SquareKanban, Users } from 'lucide-react';
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -56,18 +56,29 @@ function WorkRecords() {
   const datasets = useSynced<StoredFile[]>('datasets', 'datasets:state') ?? [];
   const { state: kanban } = useKanban();
 
-  const memberId = useSearchParams().get('member') || me?.id || '';
-  const person = members.find((m) => m.id === memberId) ?? (me?.id === memberId ? me : null);
-  const isMe = person?.id === me?.id;
+  // ?member 가 없으면 팀 전체 보기 (모두의 작업물), 있으면 그 사람의 기록
+  const memberId = useSearchParams().get('member');
+  const viewAll = !memberId;
+  const person = viewAll ? null : members.find((m) => m.id === memberId) ?? (me?.id === memberId ? me : null);
+  const isMe = !!person && person.id === me?.id;
 
   const [filter, setFilter] = useState<'all' | Kind>('all');
   const [editing, setEditing] = useState<Work | 'new' | null>(null);
+  const setTab = (id: string | null) => {
+    setFilter('all');
+    router.replace(id ? `/work?member=${id}` : '/work');
+  };
 
   const allTasks = kanban?.tasks ?? [];
   const doneId = kanban ? doneColumnId(kanban.columns) : undefined;
 
   // 이 사람의 기록 모으기
   const entries = useMemo<Entry[]>(() => {
+    if (viewAll) {
+      return (works ?? [])
+        .map<Entry>((w) => ({ key: `w-${w.id}`, kind: w.section, date: localDate(w.createdAt), work: w }))
+        .sort((a, b) => b.work!.createdAt.localeCompare(a.work!.createdAt));
+    }
     if (!person) return [];
     const list: Entry[] = [];
     (works ?? []).forEach((w) => {
@@ -85,7 +96,7 @@ function WorkRecords() {
       .filter((d) => (d.uploaderId ? d.uploaderId === person.id : d.uploaderName === person.name))
       .forEach((d) => list.push({ key: `d-${d.id}`, kind: 'dataset', date: localDate(d.createdAt), dataset: d }));
     return list.sort((a, b) => (b.date || '0').localeCompare(a.date || '0'));
-  }, [person, works, allTasks, doneId, meetings, datasets]);
+  }, [viewAll, person, works, allTasks, doneId, meetings, datasets]);
 
   const counts = useMemo(() => {
     const c: Record<Kind, number> = { team: 0, personal: 0, task: 0, meeting: 0, dataset: 0 };
@@ -112,12 +123,12 @@ function WorkRecords() {
   };
 
   if (!me || !works) return <p className="text-xs text-gray-400">불러오는 중...</p>;
-  if (!person) {
+  if (!viewAll && !person) {
     return (
       <div className="py-20 text-center space-y-3">
         <p className="text-sm text-gray-500">팀원을 찾을 수 없어요.</p>
         <Link href="/work" className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
-          내 작업 기록으로 <ChevronRight size={14} />
+          팀 전체 작업 기록으로 <ChevronRight size={14} />
         </Link>
       </div>
     );
@@ -127,44 +138,67 @@ function WorkRecords() {
     <div className="space-y-6">
       <header className="border-b border-gray-200 dark:border-slate-800 pb-4 flex flex-wrap gap-3 justify-between items-center">
         <div className="flex items-center gap-3">
-          <span className="w-11 h-11 rounded-full text-white font-bold flex items-center justify-center shrink-0" style={{ backgroundColor: person.color }}>
-            {person.name.slice(0, 2)}
-          </span>
+          {person && (
+            <span className="w-11 h-11 rounded-full text-white font-bold flex items-center justify-center shrink-0" style={{ backgroundColor: person.color }}>
+              {person.name.slice(0, 2)}
+            </span>
+          )}
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">{isMe ? '내' : `${person.name}님의`} 작업 기록</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">
+              {person ? `${isMe ? '내' : `${person.name}님의`} 작업 기록` : '작업 기록'}
+            </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              팀 작업물에서 맡은 역할과 개인 작업물, 완료한 카드·참석한 회의·올린 데이터셋이 모여요.
+              {person
+                ? '팀 작업물에서 맡은 역할과 개인 작업물, 완료한 카드·참석한 회의·올린 데이터셋이 모여요.'
+                : '팀원 모두가 올린 작업물이에요. 팀/개인 표시를 누르면 언제든 분류를 바꿀 수 있어요.'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={person.id}
-            onChange={(e) => router.push(e.target.value === me.id ? '/work' : `/work?member=${e.target.value}`)}
-            className="text-xs border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-gray-100 rounded-lg px-2 py-2 outline-none"
-            aria-label="팀원 선택"
-          >
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-                {m.id === me.id ? ' (나)' : ''}
-              </option>
-            ))}
-          </select>
-          {isMe && (
-            <button
-              onClick={() => setEditing('new')}
-              className="bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs"
-            >
-              + 작업물 올리기
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => setEditing('new')}
+          className="bg-gray-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs"
+        >
+          + 작업물 올리기
+        </button>
       </header>
 
+      {/* 팀원 탭 */}
+      <div className="flex flex-wrap gap-1.5" role="tablist">
+        {[null, me, ...members.filter((m) => m.id !== me.id)].map((m) => {
+          const active = m ? person?.id === m.id : viewAll;
+          const n = m
+            ? (works ?? []).filter((w) => w.ownerId === m.id || (w.section === 'team' && w.contributors.some((c) => c.name === m.name))).length
+            : (works ?? []).length;
+          return (
+            <button
+              key={m?.id ?? 'all'}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(m?.id ?? null)}
+              className={`flex items-center gap-1.5 ${m ? 'pl-1.5' : 'pl-3'} pr-3 py-1.5 rounded-full text-xs border transition ${
+                active
+                  ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900 font-bold'
+                  : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {m ? (
+                <span className="w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center" style={{ backgroundColor: m.color }}>
+                  {m.name.slice(0, 1)}
+                </span>
+              ) : (
+                <Users size={13} />
+              )}
+              {m ? m.name : '팀 전체'}
+              {m?.id === me.id && <span className={active ? 'opacity-70' : 'text-gray-400'}>(나)</span>}
+              <span className={active ? 'opacity-70' : 'text-gray-400'}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* 요약 + 필터 */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {(['all', 'team', 'personal', 'task', 'meeting', 'dataset'] as const).map((k) => {
+      <div className={`grid gap-2 ${viewAll ? 'grid-cols-3' : 'grid-cols-3 md:grid-cols-6'}`}>
+        {(viewAll ? (['all', 'team', 'personal'] as const) : (['all', 'team', 'personal', 'task', 'meeting', 'dataset'] as const)).map((k) => {
           const active = filter === k;
           const n = k === 'all' ? entries.length : counts[k];
           return (
@@ -188,7 +222,7 @@ function WorkRecords() {
       {visible.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl py-14 text-center space-y-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">아직 기록이 없어요.</p>
-          {isMe && filter !== 'task' && filter !== 'meeting' && filter !== 'dataset' && (
+          {(viewAll || isMe) && filter !== 'task' && filter !== 'meeting' && filter !== 'dataset' && (
             <button onClick={() => setEditing('new')} className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:underline">
               첫 작업물 올리기 <ChevronRight size={14} />
             </button>
@@ -206,11 +240,13 @@ function WorkRecords() {
                   <EntryCard
                     key={e.key}
                     entry={e}
-                    personName={person.name}
+                    personName={person?.name ?? me.name}
+                    showOwner={viewAll}
                     me={me}
                     tasks={allTasks}
                     members={members}
                     onEdit={(w) => setEditing(w)}
+                    onToggleSection={(w) => run({ type: 'work:update', payload: { id: w.id, section: w.section === 'team' ? 'personal' : 'team' } })}
                     onDelete={(w) =>
                       confirm(`'${w.title}' 작업물을 삭제할까요?${w.file ? '\n첨부한 파일도 함께 삭제됩니다.' : ''}`) &&
                       run({ type: 'work:delete', payload: { id: w.id } })
@@ -242,18 +278,22 @@ function WorkRecords() {
 function EntryCard({
   entry,
   personName,
+  showOwner,
   me,
   tasks,
   members,
   onEdit,
+  onToggleSection,
   onDelete,
 }: {
   entry: Entry;
-  personName: string; // 지금 보고 있는 사람
+  personName: string; // 지금 보고 있는 사람 (팀 전체 보기면 나)
+  showOwner: boolean;
   me: Member;
   tasks: KanbanTask[];
   members: Member[];
   onEdit: (w: Work) => void;
+  onToggleSection: (w: Work) => void;
   onDelete: (w: Work) => void;
 }) {
   const card = 'bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 flex gap-3';
@@ -275,9 +315,25 @@ function EntryCard({
         {dateCol}
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            {badge}
+            {canEdit ? (
+              <button
+                onClick={() => onToggleSection(w)}
+                title={`${w.section === 'team' ? '개인' : '팀'} 작업물로 바꾸기`}
+                className={`group inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 transition hover:ring-1 hover:ring-current ${KIND_STYLE[entry.kind]}`}
+              >
+                {KIND_LABEL[entry.kind]}
+                <ArrowLeftRight size={10} className="opacity-40 group-hover:opacity-100" />
+              </button>
+            ) : (
+              badge
+            )}
             <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300">{w.category}</span>
-            {w.section === 'team' && owner && <span className="text-[10px] text-gray-400">올린 사람 {owner.name}</span>}
+            {owner && (showOwner || w.section === 'team') && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: owner.color }} />
+                {w.section === 'team' ? `올린 사람 ${owner.name}` : owner.name}
+              </span>
+            )}
           </div>
           <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100 break-words">{w.title}</h3>
           {w.description && <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">{w.description}</p>}

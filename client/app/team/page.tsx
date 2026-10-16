@@ -223,7 +223,7 @@ function MemberModal({
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">담당 업무 ({tasks.length})</h4>
-          <Link href={isMe ? '/work' : `/work?member=${member.id}`} className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
+          <Link href={`/work?member=${member.id}`} className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
             <Award size={12} /> 작업 기록 보기 <ChevronRight size={12} />
           </Link>
         </div>
